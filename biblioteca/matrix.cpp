@@ -1,5 +1,7 @@
 #include <iostream>
+#include <iomanip>
 #include "cmdformat.cpp"
+using namespace std;
 
 template <class Type>
 class Matrix {  
@@ -7,27 +9,26 @@ class Matrix {
     Type **myself;
     int nrows;
     int ncols;
-
-  public:    
     
+  public:     
   Matrix<Type>(int m, int n){
     myself = (Type **) calloc(m,sizeof(Type *));
     if(myself == nullptr){
-      std::cout << "Allocation error.";
-      exit(-7);
+      cout << _FRED << "Memory allocation error." << _RST << endl;
+      exit(7);
     }
     register int i;
     for(i=0; i<m; i++){
       myself[i] = (Type *) calloc(n, sizeof(Type));
       if(myself[i] == nullptr){
-        std::cout << _FRED <<"Allocation error." << _RST;            
-        exit(-7);
+        cout << _FRED <<"Memory allocation error." << _RST << endl;            
+        exit(7);
       }
     }
     this->nrows = m;
-    this->ncols = n; 
-   
+    this->ncols = n;   
   }
+
   ~Matrix(){
     register int i;
     for(i=0; i<this->nrows; i++){
@@ -36,16 +37,27 @@ class Matrix {
         delete[] myself;
     }
 
-void print(){
-  int i, j;
-  std::cout << _FBLUE;
-  for(i=0;i<this->nrows;i++){
-    for(j=0;j<this->nrows;j++){
-       std::cout << myself[i][j] << "__";
+void print(int precision=4){
+  register int i, j;
+  int setw_ = precision+3;
+
+  cout << _FYELLOW;
+  for(j=0;j<this->ncols;j++){
+      cout << fixed << setprecision(precision) << setw(setw_) << setfill(' ')
+      << j+1 << "  ";
     }
-    std::cout << "\b\b  \n";
+  cout << _RST << endl;
+
+
+  cout << _FBLUE;
+  for(i=0;i<this->nrows;i++){
+    for(j=0;j<this->ncols;j++){
+      cout << fixed << setprecision(precision) << setw(setw_) << setfill(' ')
+      << myself[i][j] << "  ";
+    }
+    cout << endl;
   }
-  std::cout << _RST;
+  cout << _RST << endl;
 }
 
 Type get(int i, int j){
