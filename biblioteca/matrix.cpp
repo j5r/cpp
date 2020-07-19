@@ -1,7 +1,14 @@
 #include <iostream>
 #include <iomanip>
+#include <string>
 #include "cmdformat.cpp"
 using namespace std;
+
+
+int min(int a, int b){return a<b?a:b;}
+int max(int a, int b){return a>b?a:b;}
+
+
 
 template <class Type>
 class Matrix {  
@@ -39,58 +46,6 @@ class Matrix {
         delete[] myself;
     }
 
-void print(int precision=4){
-  register int i, j;
-  bool dotsrows, dotscols;
-  int setw_ = precision + 8;
-
-  cout << _FYELLOW << setw(7) << setfill(' ') << right  << "Matrix";  
-  dotscols = (this->ncols > 6);
-  for(j=0; j<this->ncols; j++){
-    if((this->ncols>6) && (j>2 && j<this->ncols-3)){
-      if(dotscols){          
-        cout << left << setw(5) << "...";
-        dotscols = false;
-      }
-        continue;
-    }
-      cout << right << setprecision(precision) << setw(setw_) << setfill(' ');
-      cout << j + 1 << "  ";
-  }
-  cout << endl << _FBLUE;
-  
-  dotsrows = (this->nrows > 6);
-  for(i=0; i<this->nrows; i++){
-    dotscols = (this->ncols >6);    
-    if(this->nrows>6 && (i>2 && i<this->nrows-3)){
-      if(dotsrows){
-        cout << _FYELLOW <<setprecision(precision) << setw(7) << setfill(' ')
-            << right << ":";
-        cout << _FBLUE << setprecision(precision) << setw(setw_+1) << setfill(' ')
-            << right << ":\n";
-        dotsrows = false;
-      }
-      continue;
-    }
-    
-    cout << _FYELLOW << setw(7) << setfill(' ') << right  << i + 1 << _FBLUE;
-
-    for(j=0; j<this->ncols; j++){      
-      if((this->ncols>6) && (j>2 && j<this->ncols-3)){
-        if(dotscols){          
-          cout << left << setw(5) << "...";
-          dotscols = false;
-        }
-        continue;
-      }
-      cout << scientific << right << setprecision(precision) << setw(setw_) << setfill(' ');
-      cout << myself[i][j] << "  ";
-    }
-    cout << endl;
-  }
-  cout << _RST << endl;
-}
-
 Type get(int i, int j){
   i = (this->nrows + i )% this->nrows;
   j = (this->ncols + j )% this->ncols;
@@ -112,4 +67,92 @@ void set(int i, int j, Type value){
 }
    
   
+
+
+
+
+void print(int precision=4){  
+  string INDICES = _FYELLOW; 
+  string MAINCOLOR = _FPINK;
+  register int i, j;
+  int setw_ = precision + 8;
+
+  // first line with indexes
+  cout << endl << INDICES << left << setw(7) << "Matrix";
+  for(j=0; j<min(this->ncols, 3); j++){
+    cout << right << setprecision(precision) << setw(setw_) << setfill(' ') 
+    << j << "  ";      
+  }
+  
+  if(this->ncols > 3){
+    if(this->ncols > 6){
+      cout << scientific <<  setw(3) << setfill(' ') << "..."; 
+    }
+
+    for(j=max(3,this->ncols-3); j<this->ncols; j++){
+      cout << right << setprecision(precision) << setw(setw_) << setfill(' ') 
+      << j << "  ";   
+    }
+  }
+  cout << endl;
+
+  //the rest of lines, with indexes and numbers
+  for(i=0; i<min(this->nrows, 3); i++){
+    cout << INDICES << "|" << right << setw(6) << i;
+
+    for(j=0; j<min(this->ncols, 3); j++){
+      cout << MAINCOLOR << scientific << right << setprecision(precision) 
+      << setw(setw_) << setfill(' ') << myself[i][j] << "  ";      
+    }
+
+    if(this->ncols > 3){
+      if(this->ncols > 6){
+        cout << scientific <<  setw(3) << setfill(' ') << "..."; 
+      }
+
+      for(j=max(3,this->ncols-3); j<this->ncols; j++){
+        cout << MAINCOLOR << scientific << right << setprecision(precision) 
+        << setw(setw_) << setfill(' ') << myself[i][j] << "  ";   
+      }
+    }
+    cout << endl;
+  }
+
+  if(this->nrows>3){
+    if(this->nrows>6){
+      cout << INDICES << "|" << right << setw(6) << ":";
+      cout << MAINCOLOR << setprecision(precision) << setw(setw_) 
+      << setfill(' ') << right << ":" << endl;
+    }
+
+    for(i=max(this->nrows-3, 3); i<this->nrows; i++){
+      cout << INDICES << "|" << right << setw(6) << i;
+
+      for(j=0; j<min(this->ncols,3); j++){
+        cout <<  MAINCOLOR << scientific << right << setprecision(precision) 
+        << setw(setw_) << setfill(' ') << myself[i][j] << "  ";      
+      }
+
+      if(this->ncols > 3){
+        if(this->ncols > 6){
+          cout << scientific << setw(3) << setfill(' ') << "..."; 
+        }
+        
+        for(j=max(this->ncols-3, 3); j<this->ncols; j++){
+          cout << scientific << right << setprecision(precision) << setw(setw_) 
+          << setfill(' ') << myself[i][j] << "  ";   
+        }
+      }    
+      cout << endl;
+    }
+  }
+
+  cout << INDICES << "|" <<setfill('_') << setw(7) << " " << "(" << rows() 
+  << ", " << cols() << ")";
+  cout << endl << setfill(' ') << _RST;
+}
+
+int cols(){return this->ncols;}
+int rows(){return this->nrows;}
+
 };
