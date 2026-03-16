@@ -1,1 +1,5 @@
-biblioteca/main
+﻿*.pdf
+*.csv
+*.txt
+*.exe
+*.ini
