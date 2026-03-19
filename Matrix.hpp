@@ -21,12 +21,12 @@ inline int j5r(size_t seconds = 5)
     return 0;
 }
 
-inline std::string _red = "\033[1;31m";     // Vermelho brilhante
-inline std::string _blue = "\033[1;34m";    // Azul brilhante
-inline std::string _green = "\033[1;32m";   // Verde brilhante
-inline std::string _yellow = "\033[1;33m";  // Amarelo brilhante
-inline std::string _cyan = "\033[1;36m";    // Ciano brilhante
-inline std::string _magenta = "\033[1;35m"; // Magenta brilhante
+inline std::string _red = "\033[31m";     // Vermelho brilhante
+inline std::string _blue = "\033[34m";    // Azul brilhante
+inline std::string _green = "\033[32m";   // Verde brilhante
+inline std::string _yellow = "\033[33m";  // Amarelo brilhante
+inline std::string _cyan = "\033[36m";    // Ciano brilhante
+inline std::string _magenta = "\033[35m"; // Magenta brilhante
 inline std::string _reset = "\033[0m";      // Resetar cor
 
 inline void not_implemented(const std::string &method_name)
@@ -68,6 +68,7 @@ private:
     inline static size_t print_style_ = 1;
 
 public:
+    friend class MatrixLinAlg;
     // Construtores
     Matrix() : rows_(0), cols_(0) {}
     Matrix(size_t rows, size_t cols) : rows_(rows), cols_(cols), data_(rows * cols, T()) {}
@@ -114,7 +115,7 @@ public:
     static void set_print_precision(size_t precision) noexcept { Matrix<T>::print_precision_ = precision; }
     static void set_print_width(size_t width) noexcept { Matrix<T>::print_width_ = width; }
     static void set_print_color(size_t color_int) noexcept { Matrix<T>::print_color_ = (color_int % 6) + 1; }
-    static void set_print_font(size_t style_int) noexcept {Matrix<T>::print_style_ = (style_int % 9)+1;}
+    static void set_print_font(size_t style_int) noexcept { Matrix<T>::print_style_ = (style_int % 9) + 1; }
     static void set_print_debug(bool debug) noexcept { print_debug_ = debug; }
     size_t rows() const noexcept { return rows_; }
     size_t cols() const noexcept { return cols_; }
@@ -135,20 +136,40 @@ public:
         return *this;
     }
 
-    void set(size_t row, size_t col, T value)
+    void set(int64_t row, int64_t col, T value)
     {
-        if (row >= rows_ || col >= cols_)
+        if (row < 0)
+            row += rows_;
+        if (col < 0)
+            col += cols_;
+        if (row < 0 || col < 0 || row >= rows_ || col >= cols_)
         {
-            throw std::out_of_range("\nMatrix::set() Index out of range.\n");
+            throw std::out_of_range(
+                _red + "Matrix::set() index out of range.\nRange is from row[" +
+                std::to_string(-rows() + 1) + "," + std::to_string(ilrow()) + "], col[" +
+                std::to_string(-cols() + 1) + "," + std::to_string(ilcol()) + "], got [i,j]=[" +
+                std::to_string(row) + "," + std::to_string(col) + "]." + _reset);
         }
         data_[row * cols_ + col] = value;
     }
 
-    T get(size_t row, size_t col) const
+    T get(int64_t row, int64_t col) const
     {
-        if (row >= rows_ || col >= cols_)
+        auto row_in = row;
+        auto col_in = col;
+        if (row < 0)
+            row += rows();
+        if (col < 0)
+            col += cols();
+        if (row < 0 || col < 0 || row >= rows() || col >= cols())
         {
-            throw std::out_of_range("\nMatrix::get() Index out of range.\n");
+            int from_row = -this->rows();
+            int from_col = -this->cols();
+            throw std::out_of_range(
+                _red + "Matrix::get() index out of range.\nRange is\n\trow[" +
+                std::to_string(from_row) + " (same as first row), " + std::to_string(ilrow()) + " (same as last row)],\n\tcol[" +
+                std::to_string(from_col) + " (same as first col), " + std::to_string(ilcol()) + " (same as last col)],\n\tbut got [i,j]=[" +
+                std::to_string(row_in) + "," + std::to_string(col_in) + "]." + _reset);
         }
         return data_[row * cols_ + col];
     }
@@ -183,7 +204,6 @@ public:
     friend std::ostream &operator<<(std::ostream &os, const Matrix<T> &m) noexcept
     {
 
-        
         size_t width = print_width_;
         size_t color_int = print_color_;
         size_t precision = print_precision_;
@@ -213,7 +233,7 @@ public:
                     continue;
                 }
 
-                T val = m.get(i, j);
+                T val = m(i, j);
 
                 if (!std::isnan(val) && !std::isinf(val))
                 {
@@ -237,21 +257,21 @@ public:
         // ----------------------------------------------------
 
         auto color_msg = color_int != 6 ? _cyan : _magenta;
-        std::string color = "\033[" + bold +";3" + std::to_string(color_int) + "m"; // Azul brilhante
+        std::string color = "\033[" + bold + ";3" + std::to_string(color_int) + "m"; // Azul brilhante
         j5r_assert(width >= 5,
-                   "\nMatrix::print() Width must be at least 5 characters wide, you provided: " 
-                   + std::to_string(width) + ".\n");
+                   "\nMatrix::print() Width must be at least 5 characters wide, you provided: " + std::to_string(width) + ".\n");
         os << color + "Matrix: (" << m.rows_ << " x " << m.cols_ << ") ";
-        if(print_debug_){
+        if (print_debug_)
+        {
             os << " [[Debug Mode]] ";
-        os << (m.is_empty() ? "[empty matrix] " : "");
-        os << (m.is_colvector() ? "[column vector] " : "");
-        os << (m.is_rowvector() ? "[row vector] " : "");
-        os << (m.is_scalar() ? "[scalar matrix] " : "");
-        os << (m.is_square() ? "[square matrix] " : "");
-        os << (m.is_symmetric() ? "[symmetric matrix] " : "");
+            os << (m.is_empty() ? "[empty matrix] " : "");
+            os << (m.is_colvector() ? "[column vector] " : "");
+            os << (m.is_rowvector() ? "[row vector] " : "");
+            os << (m.is_scalar() ? "[scalar matrix] " : "");
+            os << (m.is_square() ? "[square matrix] " : "");
+            os << (m.is_symmetric() ? "[symmetric matrix] " : "");
         }
-        os << "[ " + color_msg + m.comment + _reset +  color + "\n";
+        os << "[ " + color_msg + m.comment + _reset + color + "\n";
 
         // 1. Padronizamos TODOS os prefixos de linha para terem exatamente 4 caracteres.
         os << "   + ";
@@ -301,7 +321,7 @@ public:
                     continue;
                 }
 
-                T val = m.get(i, j);
+                T val = m(i, j);
 
                 // 3. Devolvemos o sinal negativo que se perdia com o abs_val
                 if (val >= 0 || isnan_(val))
@@ -345,23 +365,27 @@ public:
             double size_formatted = total_bytes;
             std::string suffix = " B";
 
-            if (total_bytes >= 1024ULL * 1024 * 1024) { // Gigabytes
+            if (total_bytes >= 1024ULL * 1024 * 1024)
+            { // Gigabytes
                 size_formatted = total_bytes / (1024.0 * 1024.0 * 1024.0);
                 suffix = " GB";
-            } else if (total_bytes >= 1024 * 1024) {    // Megabytes
+            }
+            else if (total_bytes >= 1024 * 1024)
+            { // Megabytes
                 size_formatted = total_bytes / (1024.0 * 1024.0);
                 suffix = " MB";
-            } else if (total_bytes >= 1024) {           // Kilobytes
+            }
+            else if (total_bytes >= 1024)
+            { // Kilobytes
                 size_formatted = total_bytes / 1024.0;
                 suffix = " KB";
             }
             os << " | Size: [" << std::fixed << std::setprecision(2) << size_formatted
-            <<suffix<< "]";
+               << suffix << "]";
         }
-        os <<  _reset;
+        os << _reset;
         return os;
     }
-
 
     void print(const std::string &appendix = "") const noexcept
     {
@@ -475,15 +499,15 @@ public:
     // --- MÉTODOS DE ACESSO ---
 
     // 1. Versão para leitura e escrita (retorna a referência da memória)
-    T &operator()(size_t i, size_t j) noexcept
-    {
-        return data_[i * cols_ + j];
+    T &operator()(size_t row, size_t col) noexcept    {
+
+        return data_[row * cols_ + col];
     }
 
     // 2. Versão apenas para leitura (usada quando a matriz é const)
-    const T &operator()(size_t i, size_t j) const noexcept
-    {
-        return data_[i * cols_ + j];
+    const T &operator()(size_t row, size_t col) const noexcept    {
+
+        return data_[row * cols_ + col];
     }
 
     // --- MÉTODOS DE ÁLGEBRA LINEAR ---
@@ -1380,22 +1404,6 @@ public:
         return result;
     }
 
-    [[nodiscard]] Matrix<T> pivot(size_t pivot_row, size_t pivot_col) const
-    {
-        if (pivot_row >= rows_ || pivot_col >= cols_)
-        {
-            throw std::out_of_range(_red + "\nMatrix::pivot() Error: Pivot row and column indices must be within matrix dimensions.\nGot pivot_row=" + std::to_string(pivot_row) + " and pivot_col=" + std::to_string(pivot_col) + "." + _reset);
-        }
-
-        Matrix<T> result(rows_, cols_);
-
-        /*
-        implementacao do pivotamento:
-        */
-        not_implemented("Matrix::pivot()");
-        return result;
-    }
-
     template <typename U>
     Matrix<uint8_t> operator>(const U &scalar) const
     {
@@ -1404,7 +1412,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) > scalar);
+                result.set(i, j, this->operator()(i, j) > scalar);
             }
         }
         return result;
@@ -1418,7 +1426,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) >= scalar);
+                result.set(i, j, this->operator()(i, j) >= scalar);
             }
         }
         return result;
@@ -1432,7 +1440,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) < scalar);
+                result.set(i, j, this->operator()(i, j) < scalar);
             }
         }
         return result;
@@ -1446,7 +1454,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) <= scalar);
+                result.set(i, j, this->operator()(i, j) <= scalar);
             }
         }
         return result;
@@ -1460,7 +1468,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) == scalar);
+                result.set(i, j, this->operator()(i, j) == scalar);
             }
         }
         return result;
@@ -1474,7 +1482,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) != scalar);
+                result.set(i, j, this->operator()(i, j) != scalar);
             }
         }
         return result;
@@ -1497,7 +1505,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) > other.get(i, j));
+                result.set(i, j, this->operator()(i, j) > other(i, j));
             }
         }
         return result;
@@ -1520,7 +1528,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) < other.get(i, j));
+                result.set(i, j, this->operator()(i, j) < other(i, j));
             }
         }
         return result;
@@ -1543,7 +1551,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) >= other.get(i, j));
+                result.set(i, j, this->operator()(i, j) >= other(i, j));
             }
         }
         return result;
@@ -1566,7 +1574,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) <= other.get(i, j));
+                result.set(i, j, this->operator()(i, j) <= other(i, j));
             }
         }
         return result;
@@ -1589,7 +1597,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) == other.get(i, j));
+                result.set(i, j, this->operator()(i, j) == other(i, j));
             }
         }
         return result;
@@ -1612,7 +1620,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->get(i, j) != other.get(i, j));
+                result.set(i, j, this->operator()(i, j) != other(i, j));
             }
         }
         return result;
@@ -1624,24 +1632,24 @@ public:
         return this == &other;
     }
 
-
     // --- GRAVAÇÃO EM BINÁRIO ---
     void save_to_binary(const std::string &filename) const
     {
         // A flag std::ios::binary é o que desliga a formatação de texto
         std::ofstream file(filename, std::ios::binary);
 
-        if (!file.is_open()) {
+        if (!file.is_open())
+        {
             throw std::runtime_error("\nMatrix::save_to_binary() Error: Could not open file.\n");
         }
 
         // 1. Grava as dimensões (cabeçalho)
         // reinterpret_cast converte o endereço da variável num ponteiro de bytes puros
-        file.write(reinterpret_cast<const char*>(&rows_), sizeof(size_t));
-        file.write(reinterpret_cast<const char*>(&cols_), sizeof(size_t));
+        file.write(reinterpret_cast<const char *>(&rows_), sizeof(size_t));
+        file.write(reinterpret_cast<const char *>(&cols_), sizeof(size_t));
 
         // 2. Grava TODOS os dados da matriz de uma só vez (A MÁGICA DA VELOCIDADE!)
-        file.write(reinterpret_cast<const char*>(data_.data()), data_.size() * sizeof(T));
+        file.write(reinterpret_cast<const char *>(data_.data()), data_.size() * sizeof(T));
 
         file.close();
     }
@@ -1651,15 +1659,16 @@ public:
     {
         std::ifstream file(filename, std::ios::binary);
 
-        if (!file.is_open()) {
+        if (!file.is_open())
+        {
             throw std::runtime_error("\nMatrix::load_from_binary() Error: Could not open file.\n");
         }
 
         size_t new_rows, new_cols;
 
         // 1. Lê o cabeçalho (dimensões)
-        file.read(reinterpret_cast<char*>(&new_rows), sizeof(size_t));
-        file.read(reinterpret_cast<char*>(&new_cols), sizeof(size_t));
+        file.read(reinterpret_cast<char *>(&new_rows), sizeof(size_t));
+        file.read(reinterpret_cast<char *>(&new_cols), sizeof(size_t));
 
         // 2. Prepara a matriz para receber os dados
         this->rows_ = new_rows;
@@ -1667,7 +1676,7 @@ public:
         this->data_.resize(new_rows * new_cols);
 
         // 3. Despeja os dados do ficheiro direto para a memória RAM num único comando
-        file.read(reinterpret_cast<char*>(data_.data()), data_.size() * sizeof(T));
+        file.read(reinterpret_cast<char *>(data_.data()), data_.size() * sizeof(T));
 
         file.close();
     }

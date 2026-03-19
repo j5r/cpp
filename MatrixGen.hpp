@@ -6,6 +6,7 @@
 class MatrixGen
 {
 private:
+  MatrixGen() = delete;
   inline static int seed = -1;
 
   static std::mt19937 create_engine()
@@ -25,7 +26,7 @@ private:
       gen.seed(static_cast<unsigned int>(seed));
     }
     return gen;
-  }
+  } 
 
 public:
   static void set_random_seed(int s) { seed = s; }
@@ -137,11 +138,10 @@ public:
   }
 
   template <typename T>
-  static Matrix<size_t> randd(const Matrix<T>&distrib, size_t nrows, size_t ncols=1){
-    auto sum_up_to_one = distrib.sum().sum(1).operator()(0,0);
-    
-    Matrix<size_t> result(nrows,ncols);
+  static Matrix<size_t> randd(const Matrix<T> &distrib, size_t nrows, size_t ncols = 1)
+  {
+    auto sum_up_to_one = distrib.sum().sum(1).operator()(0, 0);
 
+    Matrix<size_t> result(nrows, ncols);
   }
-
 };

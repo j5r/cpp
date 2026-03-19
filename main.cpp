@@ -2,9 +2,11 @@
 #include "Matrix.hpp"
 #include "MatrixShape.hpp"
 #include "MatrixGen.hpp"
+#include "MatrixLinAlg.hpp"
 
 int main()
 {
+    using alg = MatrixLinAlg;
     using shape = MatrixShape;
     using gen = MatrixGen;
     using mx = Matrix<double>;
@@ -24,21 +26,14 @@ int main()
     //  mx::set_print_color(1);
     //    mx::set_print_font(1);
 
-mxi A= gen::randi<int>(100,100);
-mx B(100,100);
-B.save_to_binary("B.dat");
-B.save_to_file("B.csv");
-
-mxb C = A > 0.5;
-C.msg("A>0.5");
-
-
-std::cout <<A ;
-std::cout <<B ;
-std::cout <<C ;
-A.save_to_binary("A.dat");
-A.save_to_file("A.csv");
-
+mxi A={{1,2,3},{4,5,6}};
+alg::pivot(A,1,2).print();
+try{
+std::cout << A << "\n";
+std::cout << A.get(-1,-3) << "\n";
+}catch(const std::exception& e){
+    std::cout << e.what() << "\n";
+}
 
     return j5r(100);
 }
