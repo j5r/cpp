@@ -11,47 +11,46 @@
 #include <random>
 #include <type_traits>
 #include <typeinfo>
-#include "j5rassert.cpp" // Para usar a macro de assert personalizada
+#include <initializer_list>
+#include "j5rassert.hpp" // Para usar a macro de assert personalizada
 
-int j5r(size_t seconds = 5)
+inline int j5r(size_t seconds = 5)
 {
     auto command = "cmd /c timeout " + std::to_string(seconds);
     system(command.c_str());
     return 0;
 }
 
+inline std::string _red = "\033[1;31m";     // Vermelho brilhante
+inline std::string _blue = "\033[1;34m";    // Azul brilhante
+inline std::string _green = "\033[1;32m";   // Verde brilhante
+inline std::string _yellow = "\033[1;33m";  // Amarelo brilhante
+inline std::string _cyan = "\033[1;36m";    // Ciano brilhante
+inline std::string _magenta = "\033[1;35m"; // Magenta brilhante
+inline std::string _reset = "\033[0m";      // Resetar cor
 
-
-std::string _red = "\033[1;31m";     // Vermelho brilhante
-std::string _blue = "\033[1;34m";    // Azul brilhante
-std::string _green = "\033[1;32m";   // Verde brilhante
-std::string _yellow = "\033[1;33m";  // Amarelo brilhante
-std::string _cyan = "\033[1;36m";    // Ciano brilhante
-std::string _magenta = "\033[1;35m"; // Magenta brilhante
-std::string _reset = "\033[0m";      // Resetar cor
-
-void not_implemented(const std::string &method_name)
+inline void not_implemented(const std::string &method_name)
 {
     std::cout << _blue + "\nMethod " + method_name + " is not implemented yet.\n" + _reset;
 }
 
-void aqui()
+inline void aqui()
 {
     std::cout << _blue + "\nReached the 'aqui()' breakpoint. Press Enter to continue...\n" + _reset;
     std::cin.get();
 }
 
 template <typename T>
-T inf_() { return std::numeric_limits<T>::infinity(); }
+inline T inf_() noexcept { return std::numeric_limits<T>::infinity(); }
 
 template <typename T>
-T nan_() { return std::numeric_limits<T>::quiet_NaN(); }
+inline T nan_() noexcept { return std::numeric_limits<T>::quiet_NaN(); }
 
 template <typename T>
-bool isinf_(T value) { return std::isinf(value); }
+inline bool isinf_(T value) noexcept { return std::isinf(value); }
 
 template <typename T>
-bool isnan_(T value) { return std::isnan(value); }
+inline bool isnan_(T value) noexcept { return std::isnan(value); }
 
 template <typename T>
 class Matrix
@@ -65,35 +64,77 @@ private:
     inline static size_t print_precision_ = 6;
     inline static size_t print_width_ = 6;
     inline static size_t print_color_ = 3; // 1-red, 2-green, 3-yellow, 4-blue, 5-magenta, 6-cyan
+    inline static bool print_debug_ = false;
+    inline static size_t print_style_ = 1;
 
 public:
     // Construtores
     Matrix() : rows_(0), cols_(0) {}
     Matrix(size_t rows, size_t cols) : rows_(rows), cols_(cols), data_(rows * cols, T()) {}
     Matrix(size_t rows, size_t cols, T initial_value) : rows_(rows), cols_(cols), data_(rows * cols, initial_value) {}
+    // --- CONSTRUTOR COM LISTA DE INICIALIZAÇÃO ---
+
+    Matrix(std::initializer_list<std::initializer_list<T>> list)
+    {
+        this->rows_ = list.size();
+
+        // Se a lista estiver vazia (ex: Matrix m = {}), cria uma matriz 0x0
+        if (this->rows_ == 0)
+        {
+            this->cols_ = 0;
+            return;
+        }
+
+        // Descobre o número de colunas olhando para o tamanho da primeira linha
+        this->cols_ = list.begin()->size();
+
+        // Aloca a memória necessária de uma só vez
+        data_.resize(this->rows_ * this->cols_);
+
+        size_t i = 0;
+        for (const auto &row_list : list)
+        {
+            // [Barreira de segurança: Garante que a matriz é perfeitamente retangular]
+            if (row_list.size() != this->cols_)
+            {
+                throw std::invalid_argument("\nMatrix Constructor Error: All rows must have the same number of columns.\n");
+            }
+
+            size_t j = 0;
+            for (const auto &val : row_list)
+            {
+                this->operator()(i, j) = val;
+                j++;
+            }
+            i++;
+        }
+    }
 
     // Getters e Setters
-    static void set_print_precision(size_t precision) { Matrix<T>::print_precision_ = precision; }
-    static void set_print_width(size_t width) { Matrix<T>::print_width_ = width; }
-    static void set_print_color(size_t color_int) { Matrix<T>::print_color_ = (color_int % 6) + 1; }
-    size_t rows() const { return rows_; }
-    size_t cols() const { return cols_; }
-    size_t ilrow() const { return rows_ - 1; }                                               // index of last row (ilrow)
-    size_t ilcol() const { return cols_ - 1; }                                               // index of last column (ilcol)
-    std::string size() const { return std::to_string(rows_) + "x" + std::to_string(cols_); } // [Conveniência para mensagens de erro e comentários]
-    void printsize() const { std::cout << rows_ << "x" << cols_; }                           // [Método de conveniência para imprimir o tamanho da matriz em mensagens]
-    bool is_empty() const { return rows_ == 0 || cols_ == 0; }
-    bool is_square() const { return rows_ == cols_; }
-    bool is_scalar() const { return rows_ == 1 && cols_ == 1; }
-    bool is_rowvector() const { return rows_ == 1 && cols_ > 1; }
-    bool is_colvector() const { return cols_ == 1 && rows_ > 1; }
-    bool is_symmetric() const { return this->is_square() && (this->equals(this->t())); }
+    static void set_print_precision(size_t precision) noexcept { Matrix<T>::print_precision_ = precision; }
+    static void set_print_width(size_t width) noexcept { Matrix<T>::print_width_ = width; }
+    static void set_print_color(size_t color_int) noexcept { Matrix<T>::print_color_ = (color_int % 6) + 1; }
+    static void set_print_font(size_t style_int) noexcept {Matrix<T>::print_style_ = (style_int % 9)+1;}
+    static void set_print_debug(bool debug) noexcept { print_debug_ = debug; }
+    size_t rows() const noexcept { return rows_; }
+    size_t cols() const noexcept { return cols_; }
+    size_t ilrow() const noexcept { return rows_ - 1; }                                               // index of last row (ilrow)
+    size_t ilcol() const noexcept { return cols_ - 1; }                                               // index of last column (ilcol)
+    std::string size() const noexcept { return std::to_string(rows_) + "x" + std::to_string(cols_); } // [Conveniência para mensagens de erro e comentários]
+    void printsize() const noexcept { std::cout << rows_ << "x" << cols_; }                           // [Método de conveniência para imprimir o tamanho da matriz em mensagens]
+    bool is_empty() const noexcept { return rows_ == 0 || cols_ == 0; }
+    bool is_square() const noexcept { return rows_ == cols_; }
+    bool is_scalar() const noexcept { return rows_ == 1 && cols_ == 1; }
+    bool is_rowvector() const noexcept { return rows_ == 1 && cols_ > 1; }
+    bool is_colvector() const noexcept { return cols_ == 1 && rows_ > 1; }
+    bool is_symmetric() const noexcept { return this->is_square() && (this->equals(this->t())); }
 
-    Matrix<T> msg(const std::string &comment)
+    Matrix<T> &msg(const std::string &comment) noexcept
     {
         this->comment = comment;
         return *this;
     }
+
     void set(size_t row, size_t col, T value)
     {
         if (row >= rows_ || col >= cols_)
@@ -102,6 +143,7 @@ public:
         }
         data_[row * cols_ + col] = value;
     }
+
     T get(size_t row, size_t col) const
     {
         if (row >= rows_ || col >= cols_)
@@ -112,7 +154,7 @@ public:
     }
 
     // Métodos (As implementações ficam aqui dentro mesmo)
-    void from_prompt(size_t rows, size_t cols)
+    void from_prompt(size_t rows, size_t cols) noexcept
     {
         this->rows_ = rows;
         this->cols_ = cols;
@@ -128,7 +170,7 @@ public:
         }
     }
 
-    void from_prompt()
+    void from_prompt() noexcept
     {
         size_t r, c;
         std::cout << "Matrix::from_prompt() Type the number of rows: ";
@@ -138,37 +180,40 @@ public:
         this->from_prompt(r, c);
     }
 
-    void print() const
+    friend std::ostream &operator<<(std::ostream &os, const Matrix<T> &m) noexcept
     {
+
+        
         size_t width = print_width_;
         size_t color_int = print_color_;
         size_t precision = print_precision_;
+        std::string bold = std::to_string(print_style_);
 
         // --- AUTOCORREÇÃO DE GRID INTELIGENTE E OTIMIZADA ---
-        bool skip_rows = rows_ > 10;
-        bool skip_cols = cols_ > 8;
+        bool skip_rows = m.rows_ > 10;
+        bool skip_cols = m.cols_ > 8;
 
         int max_int_chars = 1;
 
-        for (size_t i = 0; i < rows_; ++i)
+        for (size_t i = 0; i < m.rows_; ++i)
         {
             // [Se a matriz for grande, salta o miolo das linhas]
             if (skip_rows && i == 3)
             {
-                i = rows_ - 4;
+                i = m.rows_ - 4;
                 continue;
             }
 
-            for (size_t j = 0; j < cols_; ++j)
+            for (size_t j = 0; j < m.cols_; ++j)
             {
                 // [Se a matriz for grande, salta o miolo das colunas]
                 if (skip_cols && j == 3)
                 {
-                    j = cols_ - 4;
+                    j = m.cols_ - 4;
                     continue;
                 }
 
-                T val = this->get(i, j);
+                T val = m.get(i, j);
 
                 if (!std::isnan(val) && !std::isinf(val))
                 {
@@ -192,81 +237,92 @@ public:
         // ----------------------------------------------------
 
         auto color_msg = color_int != 6 ? _cyan : _magenta;
-        std::string color = "\033[1;3" + std::to_string(color_int) + "m"; // Azul brilhante
+        std::string color = "\033[" + bold +";3" + std::to_string(color_int) + "m"; // Azul brilhante
         j5r_assert(width >= 5,
-                   "\nMatrix::print() Width must be at least 5 characters wide, you provided: " + std::to_string(width) + ".\n");
-        std::cout << color + "Matrix: (" << rows_ << " x " << cols_ << ") [ " + color_msg + this->comment + color + "\n";
+                   "\nMatrix::print() Width must be at least 5 characters wide, you provided: " 
+                   + std::to_string(width) + ".\n");
+        os << color + "Matrix: (" << m.rows_ << " x " << m.cols_ << ") ";
+        if(print_debug_){
+            os << " [[Debug Mode]] ";
+        os << (m.is_empty() ? "[empty matrix] " : "");
+        os << (m.is_colvector() ? "[column vector] " : "");
+        os << (m.is_rowvector() ? "[row vector] " : "");
+        os << (m.is_scalar() ? "[scalar matrix] " : "");
+        os << (m.is_square() ? "[square matrix] " : "");
+        os << (m.is_symmetric() ? "[symmetric matrix] " : "");
+        }
+        os << "[ " + color_msg + m.comment + _reset +  color + "\n";
 
         // 1. Padronizamos TODOS os prefixos de linha para terem exatamente 4 caracteres.
-        std::cout << "   + ";
+        os << "   + ";
 
-        for (size_t j = 0; j < cols_; ++j)
+        for (size_t j = 0; j < m.cols_; ++j)
         {
             if (skip_cols && j == 3)
             {
                 // 2. Padronizamos a coluna: 2 espaços + (width - 2) caracteres de texto
-                std::cout << "  " << std::setw(width - 2) << std::left << "...";
-                j = cols_ - 4;
+                os << "  " << std::setw(width - 2) << std::left << "...";
+                j = m.cols_ - 4;
                 continue;
             }
-            std::cout << "  " << std::setw(width - 2) << std::left << j;
+            os << "  " << std::setw(width - 2) << std::left << j;
         }
-        std::cout << "\n";
+        os << "\n";
 
-        for (size_t i = 0; i < rows_; ++i)
+        for (size_t i = 0; i < m.rows_; ++i)
         {
 
             if (skip_rows && i == 3)
             {
-                std::cout << color + "   :|" + _reset; // Prefixo de 4 caracteres
-                for (size_t j = 0; j < cols_; ++j)
+                os << color + "   :|" + _reset; // Prefixo de 4 caracteres
+                for (size_t j = 0; j < m.cols_; ++j)
                 {
                     if (skip_cols && j == 3)
                     {
-                        std::cout << "  " << std::setw(width - 2) << std::left << "...";
-                        j = cols_ - 4;
+                        os << "  " << std::setw(width - 2) << std::left << "...";
+                        j = m.cols_ - 4;
                         continue;
                     }
-                    std::cout << "  " << std::setw(width - 2) << std::left << ":";
+                    os << "  " << std::setw(width - 2) << std::left << ":";
                 }
-                std::cout << "\n";
-                i = rows_ - 4;
+                os << "\n";
+                i = m.rows_ - 4;
                 continue;
             }
             // O prefixo de linha agora é padronizado para 4 caracteres, alinhado à direita, e colorido
-            std::cout << color << std::setw(4) << std::right << i << "|" + _reset; // Prefixo de 4 caracteres
+            os << color << std::setw(4) << std::right << i << "|" + _reset; // Prefixo de 4 caracteres
 
-            for (size_t j = 0; j < cols_; ++j)
+            for (size_t j = 0; j < m.cols_; ++j)
             {
                 if (skip_cols && j == 3)
                 {
-                    std::cout << "  " << std::setw(width - 2) << std::left << "...";
-                    j = cols_ - 4;
+                    os << "  " << std::setw(width - 2) << std::left << "...";
+                    j = m.cols_ - 4;
                     continue;
                 }
 
-                T val = this->get(i, j);
+                T val = m.get(i, j);
 
                 // 3. Devolvemos o sinal negativo que se perdia com o abs_val
                 if (val >= 0 || isnan_(val))
                 {
-                    std::cout << "  "; // 2 espaços alinhadores para positivos
+                    os << "  "; // 2 espaços alinhadores para positivos
                 }
                 else
                 {
-                    std::cout << " -"; // 1 espaço + o sinal que foi removido do abs_val
+                    os << " -"; // 1 espaço + o sinal que foi removido do abs_val
                 }
 
                 T abs_val = (val >= 0) ? val : -val;
                 if (std::isnan(val))
                 {
                     // 4. Se for NaN, imprimimos "NaN" centralizado no espaço disponível
-                    std::cout << std::setw(width - 2) << std::left << "NaN";
+                    os << std::setw(width - 2) << std::left << "NaN";
                 }
                 else if (std::isinf(val))
                 {
                     // 5. Se for Inf, imprimimos "Inf" centralizado no espaço disponível
-                    std::cout << std::setw(width - 2) << std::left << "Inf";
+                    os << std::setw(width - 2) << std::left << "Inf";
                 }
                 else
                 {
@@ -274,13 +330,44 @@ public:
 
                     // std::cout << std::setprecision(6) << std::setw(width - 2) << std::left << abs_val;
                     //  [O precision agora se adapta ao width. O -3 desconta o espaço do ponto decimal e margem de segurança]
-                    std::cout << std::fixed << std::setprecision(precision) << std::setw(width - 2) << std::left << abs_val;
+                    os << std::fixed << std::setprecision(precision) << std::setw(width - 2) << std::left << +abs_val;
                 }
             }
-            std::cout << "\n";
+            os << "\n";
         }
-        std::cout << std::defaultfloat; // [Reseta para notação normal para evitar que o modo fixed afete outras partes do programa]
-        std::cout << color + "] type fingerprint: [" + typeid(*this).name() +"]\n" + _reset;
+        os << std::defaultfloat; // [Reseta para notação normal para evitar que o modo fixed afete outras partes do programa]
+        os << color + "]";
+        if (print_debug_)
+        {
+            os << " [[Debug Mode]] Type: [" << typeid(m).name() << "] | Address: ["
+               << &m << "]";
+            size_t total_bytes = m.rows() * m.cols() * sizeof(T);
+            double size_formatted = total_bytes;
+            std::string suffix = " B";
+
+            if (total_bytes >= 1024ULL * 1024 * 1024) { // Gigabytes
+                size_formatted = total_bytes / (1024.0 * 1024.0 * 1024.0);
+                suffix = " GB";
+            } else if (total_bytes >= 1024 * 1024) {    // Megabytes
+                size_formatted = total_bytes / (1024.0 * 1024.0);
+                suffix = " MB";
+            } else if (total_bytes >= 1024) {           // Kilobytes
+                size_formatted = total_bytes / 1024.0;
+                suffix = " KB";
+            }
+            os << " | Size: [" << std::fixed << std::setprecision(2) << size_formatted
+            <<suffix<< "]";
+        }
+        os <<  _reset;
+        return os;
+    }
+
+
+    void print(const std::string &appendix = "") const noexcept
+    {
+        auto color_msg = print_color_ != 6 ? _cyan : _magenta;
+        std::string color = "\033[1;3" + std::to_string(print_color_) + "m"; // Azul brilhante
+        std::cout << *this << " " << color << appendix + _reset + "\n";
     }
 
     // --- MÉTODOS DE ARQUIVO ---
@@ -385,20 +472,16 @@ public:
         this->data_ = std::move(temp_data); // [std::move: transfere a memória rapidamente sem fazer cópias desnecessárias]
     }
 
-    // --- MÉTODOS DE ALEATORIEDADE ---
-
-    // --- MÉTODOS DE ÁLGEBRA LINEAR ---
-
     // --- MÉTODOS DE ACESSO ---
 
     // 1. Versão para leitura e escrita (retorna a referência da memória)
-    T &operator()(size_t i, size_t j)
+    T &operator()(size_t i, size_t j) noexcept
     {
         return data_[i * cols_ + j];
     }
 
     // 2. Versão apenas para leitura (usada quando a matriz é const)
-    const T &operator()(size_t i, size_t j) const
+    const T &operator()(size_t i, size_t j) const noexcept
     {
         return data_[i * cols_ + j];
     }
@@ -406,12 +489,12 @@ public:
     // --- MÉTODOS DE ÁLGEBRA LINEAR ---
 
     // [Retorna uma nova Matrix e é assinalado como const para proteger a matriz original]
-    Matrix diag() const
+    [[nodiscard]] Matrix<T> diag() const noexcept
     {
         size_t limit = std::min(rows_, cols_);
 
         // [Cria um vetor coluna de tamanho 'limit x 1']
-        Matrix result(limit, 1);
+        Matrix<T> result(limit, 1);
 
         for (size_t i = 0; i < limit; ++i)
         {
@@ -422,7 +505,7 @@ public:
         return result;
     }
 
-    Matrix<T> t() const
+    [[nodiscard]] Matrix<T> t() const noexcept
     {
         Matrix<T> result(cols_, rows_); // Inverte as dimensões
 
@@ -437,7 +520,7 @@ public:
         return result;
     }
 
-    Matrix<T> sum(uint8_t axis = 0) const
+    [[nodiscard]] Matrix<T> sum(uint8_t axis = 0) const
     {
         if (axis == 0)
         {
@@ -479,7 +562,14 @@ public:
         }
     }
 
-    Matrix<T> mean(uint8_t axis = 0) const
+    [[nodiscard]] T sumsum() noexcept
+    {
+        Matrix<T> temp = sum();
+        temp = temp.sum(1);
+        return temp(0, 0);
+    }
+
+    [[nodiscard]] Matrix<T> mean(uint8_t axis = 0) const noexcept
     {
         Matrix<T> sum_result = this->sum(axis);
 
@@ -503,7 +593,7 @@ public:
         return sum_result;
     }
 
-    Matrix<T> var(uint8_t axis = 0) const
+    [[nodiscard]] Matrix<T> var(uint8_t axis = 0) const noexcept
     {
         Matrix<T> mean_result = this->mean(axis);
         Matrix<T> var_result(mean_result.rows(), mean_result.cols());
@@ -538,7 +628,7 @@ public:
         return var_result;
     }
 
-    Matrix<T> std(uint8_t axis = 0) const
+    [[nodiscard]] Matrix<T> std(uint8_t axis = 0) const noexcept
     {
         Matrix<T> var_result = this->var(axis);
         Matrix<T> std_result(var_result.rows(), var_result.cols());
@@ -554,7 +644,7 @@ public:
         return std_result;
     }
 
-    Matrix<T> getrows(size_t start, size_t end) const
+    [[nodiscard]] Matrix<T> getrows(size_t start, size_t end) const
     {
         if (start >= rows_ || end > rows_ || start >= end)
         {
@@ -575,7 +665,7 @@ public:
         return result;
     }
 
-    Matrix<T> getrow(size_t index) const
+    [[nodiscard]] Matrix<T> getrow(size_t index) const
     {
         if (index > this->ilrow())
         {
@@ -587,7 +677,7 @@ public:
         return this->getrows(index, index + 1);
     }
 
-    Matrix<T> getcols(size_t start, size_t end) const
+    [[nodiscard]] Matrix<T> getcols(size_t start, size_t end) const
     {
         if (start >= cols_ || end > cols_ || start >= end)
         {
@@ -608,7 +698,7 @@ public:
         return result;
     }
 
-    Matrix<T> getcol(size_t index) const
+    [[nodiscard]] Matrix<T> getcol(size_t index) const
     {
         if (index > this->ilcol())
         {
@@ -620,7 +710,7 @@ public:
         return this->getcols(index, index + 1);
     }
 
-    Matrix<T> reshape(size_t new_rows, size_t new_cols) const
+    [[nodiscard]] Matrix<T> reshape(size_t new_rows, size_t new_cols) const
     {
         if (new_rows * new_cols != rows_ * cols_)
         {
@@ -645,7 +735,7 @@ public:
         return result;
     }
 
-    Matrix<T> rmrows(size_t start, size_t end) const
+    [[nodiscard]] Matrix<T> rmrows(size_t start, size_t end) const
     {
         if (start >= rows_ || end > rows_ || start >= end)
         {
@@ -672,7 +762,7 @@ public:
         return result;
     }
 
-    Matrix<T> rmrow(size_t index) const
+    [[nodiscard]] Matrix<T> rmrow(size_t index) const
     {
         if (index > this->ilrow())
         {
@@ -684,7 +774,7 @@ public:
         return this->rmrows(index, index + 1);
     }
 
-    Matrix<T> rmcols(size_t start, size_t end) const
+    [[nodiscard]] Matrix<T> rmcols(size_t start, size_t end) const
     {
         if (start >= cols_ || end > cols_ || start >= end)
         {
@@ -711,7 +801,7 @@ public:
         return result;
     }
 
-    Matrix<T> rmcol(size_t index) const
+    [[nodiscard]] Matrix<T> rmcol(size_t index) const
     {
         if (index > this->ilcol())
         {
@@ -723,7 +813,7 @@ public:
         return this->rmcols(index, index + 1);
     }
 
-    Matrix<T> flatten() const
+    [[nodiscard]] Matrix<T> flatten() const
     {
         Matrix<T> result(rows_ * cols_, 1);
 
@@ -740,8 +830,12 @@ public:
     }
 
     template <typename U>
-    auto operator+(const Matrix<U> &other) const
+    [[nodiscard]] auto operator+(const Matrix<U> &other) const
     {
+        if (other.is_scalar())
+        {
+            return operator+(other(0, 0));
+        }
         if (rows_ != other.rows() || cols_ != other.cols())
         {
             throw std::invalid_argument(_red + "\nMatrix::operator+() Error: Matrices must have the same dimensions for addition.\nCurrent size is " + size() + " but got " + other.size() + "." + _reset);
@@ -780,6 +874,10 @@ public:
     template <typename U>
     auto operator-(const Matrix<U> &other) const
     {
+        if (other.is_scalar())
+        {
+            return operator-(other(0, 0));
+        }
         if (rows_ != other.rows() || cols_ != other.cols())
         {
             throw std::invalid_argument(_red + "\nMatrix::operator-() Error: Matrices must have the same dimensions for subtraction.\nCurrent size is " + size() + " but got " + other.size() + "." + _reset);
@@ -818,6 +916,10 @@ public:
     template <typename U>
     auto operator*(const Matrix<U> &other) const
     {
+        if (other.is_scalar())
+        {
+            return operator*(other(0, 0));
+        }
         if (cols_ != other.rows())
         {
             throw std::invalid_argument(_red + "\nMatrix::operator*() Error: Number of columns of the first matrix must equal the number of rows of the second matrix for multiplication.\nCurrent size is " + size() + " but got " + other.size() + "." + _reset);
@@ -950,6 +1052,10 @@ public:
     template <typename U>
     auto operator/(const Matrix<U> &other) const
     {
+        if (other.is_scalar())
+        {
+            return operator/(other(0, 0));
+        }
         if (cols_ != other.cols() || rows_ != other.rows())
         {
             throw std::invalid_argument(_red + "\nMatrix::operator/() Error: Incompatible matrix dimensions for element-wise division.\nCurrent size is " + size() + " but got " + other.size() + "." + _reset);
@@ -1131,7 +1237,7 @@ public:
         return result;
     }
 
-    bool equals(const Matrix<T> &other, T tolerance = static_cast<T>(1e-6)) const
+    [[nodiscard]] bool equals(const Matrix<T> &other, T tolerance = static_cast<T>(1e-6)) const
     {
         if (rows_ != other.rows() || cols_ != other.cols())
         {
@@ -1154,9 +1260,9 @@ public:
 
         return true;
     }
-    Matrix<T> operator-() const { return 0 - (*this); }
+    [[nodiscard]] Matrix<T> operator-() const { return 0 - (*this); }
 
-    Matrix<T> ew_prod(const Matrix<T> &other) const
+    [[nodiscard]] Matrix<T> ew_prod(const Matrix<T> &other) const
     {
         if (rows_ != other.rows() || cols_ != other.cols())
         {
@@ -1220,7 +1326,7 @@ public:
         std::cout << "   - ew_prod(const Matrix<T> &other): Element-wise product of two matrices.\n\n";
     }
 
-    Matrix<T> copy() const
+    [[nodiscard]] Matrix<T> copy() const
     {
         Matrix<T> result(rows_, cols_);
 
@@ -1235,7 +1341,7 @@ public:
         return result;
     }
 
-    Matrix<T> pow(int exponent) const
+    [[nodiscard]] Matrix<T> pow(int exponent) const
     {
         if (exponent < 0)
         {
@@ -1274,7 +1380,7 @@ public:
         return result;
     }
 
-    Matrix<T> pivot(size_t pivot_row, size_t pivot_col) const
+    [[nodiscard]] Matrix<T> pivot(size_t pivot_row, size_t pivot_col) const
     {
         if (pivot_row >= rows_ || pivot_col >= cols_)
         {
@@ -1290,185 +1396,285 @@ public:
         return result;
     }
 
-
     template <typename U>
-    Matrix<bool> operator>(const U&scalar) const {
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) > scalar);
+    Matrix<uint8_t> operator>(const U &scalar) const
+    {
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) > scalar);
             }
         }
         return result;
     }
 
-    
     template <typename U>
-    Matrix<bool> operator>=(const U&scalar) const {
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) >= scalar);
+    Matrix<uint8_t> operator>=(const U &scalar) const
+    {
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) >= scalar);
             }
         }
         return result;
     }
 
-
     template <typename U>
-    Matrix<bool> operator<(const U&scalar) const {
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) < scalar);
+    Matrix<uint8_t> operator<(const U &scalar) const
+    {
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) < scalar);
             }
         }
         return result;
     }
 
-
     template <typename U>
-    Matrix<bool> operator<=(const U&scalar) const {
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) <= scalar);
+    Matrix<uint8_t> operator<=(const U &scalar) const
+    {
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) <= scalar);
             }
         }
         return result;
     }
 
-
-
     template <typename U>
-    Matrix<bool> operator==(const U&scalar) const {
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) == scalar);
+    Matrix<uint8_t> operator==(const U &scalar) const
+    {
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) == scalar);
             }
         }
         return result;
     }
 
-
     template <typename U>
-    Matrix<bool> operator!=(const U&scalar) const {
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) != scalar);
+    Matrix<uint8_t> operator!=(const U &scalar) const
+    {
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) != scalar);
             }
         }
         return result;
     }
 
-
-
     template <typename U>
-    Matrix<bool> operator>(const Matrix<U>&other) const {
-        if(rows_!=other.rows() || cols_!=other.cols()){
-            throw std::invalid_argument(_red+
-            "\nMatrix::operator>() Matrices must have the same size. Got "+size()+" vs "+other.size()+".\n"
-                +_reset);
+    Matrix<uint8_t> operator>(const Matrix<U> &other) const
+    {
+        if (other.is_scalar())
+        {
+            return operator>(other(0, 0));
         }
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) > other.get(i,j));
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
+        }
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) > other.get(i, j));
             }
         }
         return result;
     }
 
-
     template <typename U>
-    Matrix<bool> operator<(const Matrix<U>&other) const {
-        if(rows_!=other.rows() || cols_!=other.cols()){
-            throw std::invalid_argument(_red+
-            "\nMatrix::operator>() Matrices must have the same size. Got "+size()+" vs "+other.size()+".\n"
-                +_reset);
+    Matrix<uint8_t> operator<(const Matrix<U> &other) const
+    {
+        if (other.is_scalar())
+        {
+            return operator<(other(0, 0));
         }
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) < other.get(i,j));
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
+        }
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) < other.get(i, j));
             }
         }
         return result;
     }
 
-
     template <typename U>
-    Matrix<bool> operator>=(const Matrix<U>&other) const {
-        if(rows_!=other.rows() || cols_!=other.cols()){
-            throw std::invalid_argument(_red+
-            "\nMatrix::operator>() Matrices must have the same size. Got "+size()+" vs "+other.size()+".\n"
-                +_reset);
+    Matrix<uint8_t> operator>=(const Matrix<U> &other) const
+    {
+        if (other.is_scalar())
+        {
+            return operator>=(other(0, 0));
         }
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) >= other.get(i,j));
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
+        }
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) >= other.get(i, j));
             }
         }
         return result;
     }
 
-
     template <typename U>
-    Matrix<bool> operator<=(const Matrix<U>&other) const {
-        if(rows_!=other.rows() || cols_!=other.cols()){
-            throw std::invalid_argument(_red+
-            "\nMatrix::operator>() Matrices must have the same size. Got "+size()+" vs "+other.size()+".\n"
-                +_reset);
+    Matrix<uint8_t> operator<=(const Matrix<U> &other) const
+    {
+        if (other.is_scalar())
+        {
+            return operator<=(other(0, 0));
         }
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) <= other.get(i,j));
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
+        }
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) <= other.get(i, j));
             }
         }
         return result;
     }
 
-
     template <typename U>
-    Matrix<bool> operator==(const Matrix<U>&other) const {
-        if(rows_!=other.rows() || cols_!=other.cols()){
-            throw std::invalid_argument(_red+
-            "\nMatrix::operator>() Matrices must have the same size. Got "+size()+" vs "+other.size()+".\n"
-                +_reset);
+    Matrix<uint8_t> operator==(const Matrix<U> &other) const
+    {
+        if (other.is_scalar())
+        {
+            return operator==(other(0, 0));
         }
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) == other.get(i,j));
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
+        }
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) == other.get(i, j));
             }
         }
         return result;
     }
 
-
     template <typename U>
-    Matrix<bool> operator!=(const Matrix<U>&other) const {
-        if(rows_!=other.rows() || cols_!=other.cols()){
-            throw std::invalid_argument(_red+
-            "\nMatrix::operator>() Matrices must have the same size. Got "+size()+" vs "+other.size()+".\n"
-                +_reset);
+    Matrix<uint8_t> operator!=(const Matrix<U> &other) const
+    {
+        if (other.is_scalar())
+        {
+            return operator!=(other(0, 0));
         }
-        Matrix<bool> result(rows_, cols_);
-        for(size_t i=0; i < rows_;i++){
-            for(size_t j=0; j<cols_; j++){
-            result.set(i,j,this->get(i,j) != other.get(i,j));
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
+        }
+        Matrix<uint8_t> result(rows_, cols_);
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                result.set(i, j, this->get(i, j) != other.get(i, j));
             }
         }
         return result;
+    }
+
+    template <typename U>
+    bool is(const Matrix<U> &other) const
+    {
+        return this == &other;
+    }
+
+
+    // --- GRAVAÇÃO EM BINÁRIO ---
+    void save_to_binary(const std::string &filename) const
+    {
+        // A flag std::ios::binary é o que desliga a formatação de texto
+        std::ofstream file(filename, std::ios::binary);
+
+        if (!file.is_open()) {
+            throw std::runtime_error("\nMatrix::save_to_binary() Error: Could not open file.\n");
+        }
+
+        // 1. Grava as dimensões (cabeçalho)
+        // reinterpret_cast converte o endereço da variável num ponteiro de bytes puros
+        file.write(reinterpret_cast<const char*>(&rows_), sizeof(size_t));
+        file.write(reinterpret_cast<const char*>(&cols_), sizeof(size_t));
+
+        // 2. Grava TODOS os dados da matriz de uma só vez (A MÁGICA DA VELOCIDADE!)
+        file.write(reinterpret_cast<const char*>(data_.data()), data_.size() * sizeof(T));
+
+        file.close();
+    }
+
+    // --- LEITURA EM BINÁRIO ---
+    void load_from_binary(const std::string &filename)
+    {
+        std::ifstream file(filename, std::ios::binary);
+
+        if (!file.is_open()) {
+            throw std::runtime_error("\nMatrix::load_from_binary() Error: Could not open file.\n");
+        }
+
+        size_t new_rows, new_cols;
+
+        // 1. Lê o cabeçalho (dimensões)
+        file.read(reinterpret_cast<char*>(&new_rows), sizeof(size_t));
+        file.read(reinterpret_cast<char*>(&new_cols), sizeof(size_t));
+
+        // 2. Prepara a matriz para receber os dados
+        this->rows_ = new_rows;
+        this->cols_ = new_cols;
+        this->data_.resize(new_rows * new_cols);
+
+        // 3. Despeja os dados do ficheiro direto para a memória RAM num único comando
+        file.read(reinterpret_cast<char*>(data_.data()), data_.size() * sizeof(T));
+
+        file.close();
     }
 };
 
 template <typename T>
-Matrix<T> diag(const Matrix<T> &m)
+[[nodiscard]] inline Matrix<T> diag(const Matrix<T> &m)
 {
     if (m.is_empty())
     {
@@ -1494,3 +1700,5 @@ Matrix<T> diag(const Matrix<T> &m)
     }
     return result;
 }
+
+using Matrixbool = Matrix<uint8_t>;
