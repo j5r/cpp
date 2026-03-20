@@ -61,7 +61,7 @@ class Matrix
 
     static_assert(!std::is_same_v<T, bool>,
                   "\033[5;32m\n[MATRIX ERROR]: Matrix<bool> is <<strictly prohibited>>\033[1m due to std::vector<bool> performance overhead. "
-                  "\nPlease use the 'Matrixbool' alias instead!\033[m\n");
+                  "\nPlease use the 'Matrixbool' alias instead! (Matrixbool is an alias for Matrix<uint8_t>)\033[m\n");
 
 private:
     size_t rows_;
@@ -199,7 +199,7 @@ public:
         return data_[row * cols_ + col];
     }
 
-    T get(int64_t index=0)
+    T get(int64_t index = 0)
     {
         auto index_in = index;
         if (index < 0)
@@ -891,17 +891,9 @@ public:
 
     [[nodiscard]] Matrix<T> flatten() const
     {
-        Matrix<T> result(rows_ * cols_, 1);
-
-        for (size_t i = 0; i < rows_; ++i)
-        {
-            for (size_t j = 0; j < cols_; ++j)
-            {
-                size_t index = i * cols_ + j;
-                result(index, 0) = this->operator()(i, j);
-            }
-        }
-
+        Matrix<T> result = *this;
+        result.rows_ = 1;
+        result.cols_ = rows()*cols();
         return result;
     }
 
@@ -1373,62 +1365,155 @@ public:
         return result;
     }
 
+    // --- INTERACTIVE DOCUMENTATION ---
     static void help()
     {
-        std::cout << "\nMatrix Class Help:\n\n";
-        std::cout << "1. Constructors:\n";
-        std::cout << "   - Matrix(): Default constructor creates an empty matrix.\n";
-        std::cout << "   - Matrix(size_t rows, size_t cols): Creates a matrix with specified dimensions initialized to zero.\n";
-        std::cout << "   - Matrix(const std::vector<std::vector<T>>& values): Creates a matrix from a 2D vector.\n\n";
+        /*
 
-        std::cout << "2. Basic Properties:\n";
-        std::cout << "   - rows(): Returns the number of rows.\n";
-        std::cout << "   - cols(): Returns the number of columns.\n";
-        std::cout << "   - size(): Returns a string representation of the matrix size (e.g., '3x4').\n";
-        std::cout << "   - is_square(): Checks if the matrix is square.\n";
-        std::cout << "   - is_rowvector(): Checks if the matrix is a row vector.\n";
-        std::cout << "   - is_colvector(): Checks if the matrix is a column vector.\n";
-        std::cout << "   - is_symmetric(): Checks if the matrix is symmetric.\n\n";
+        set_print_precision(size_t precision) noexcept { Matrix<T>::print_precision_ = precision; }
+        static void set_print_width(size_t width) noexcept { Matrix<T>::print_width_ = width; }
+        static void set_print_color(size_t color_int) noexcept { Matrix<T>::print_color_ = (color_int % 6) + 1; }
+        static void set_print_font(size_t style_int) noexcept { Matrix<T>::print_style_ = (style_int % 9) + 1; }
+        static void set_print_debug(bool debug) noexcept { print_debug_ = debug; }
+        */
 
-        std::cout << "3. Data Access:\n";
-        std::cout << "   - set(size_t row, size_t col, T value): Sets the value at the specified position.\n";
-        std::cout << "   - get(size_t row, size_t col): Gets the value at the specified position.\n";
-        std::cout << "   - operator()(size_t i, size_t j): Provides access to elements for reading and writing.\n\n";
+        std::cout << _cyan << "\n====================================================================\n"
+                  << "                 J5R MATRIX LIBRARY - DOCUMENTATION                \n"
+                  << "====================================================================\n"
+                  << _reset
 
-        std::cout << "4. Input/Output:\n";
-        std::cout << "   - from_prompt(size_t rows, size_t cols): Fills the matrix with user input values.\n";
-        std::cout << "   - from_prompt(): Prompts for dimensions and then fills the matrix with user input values.\n";
-        std::cout << "   - print(size_t width = 9, size_t color_int = 3): Prints the matrix with formatting options.\n\n";
+                  << _yellow << "\n[Constructors]\n"
+                  << _reset
+                  << "   Matrix<T> m;                      : Empty matrix.\n"
+                  << "   Matrix<T> m(nrows,ncols);         : Zero matrix with [nrows] rows and [ncols] columns.\n"
+                  << "   Matrix<T> m(nrows,ncols,value);   : Same as above, but with [value] in all entries.\n"
+                  << "   Matrix<T> m = {{1,2,3},{4,5,6}}   : A set of values are hardcoded into the matrix.\n"
+                  << "   Matrix<T> m;\n"
+                  << "   |_    m.from_prompt(nrows,ncols); : Prompts for entries from the user.\n"
+                  << "   Matrix<T> m;\n"
+                  << "   |_    m.from_prompt();            : Prompts the dimensions and entries from the user.\n";
+        std::cin.get();
 
-        std::cout << "5. File Operations:\n";
-        std::cout << "   - save_to_file(const std::string &filename, char separator = ';'): Saves the matrix to a file with an optional separator.\n";
-        std::cout << "   - load_from_file(const std::string &filename, char separator = ';'): Loads the matrix from a file with an optional separator.\n\n";
+        std::cout << _yellow << "\n[Basic Properties]\n"
+                  << _reset
+                  << "  .rows()             : Returns the number of rows (size_t).\n"
+                  << "  .cols()             : Returns the number of columns (size_t).\n"
+                  << "  .ilrow()            : Returns the index of the last row (size_t) - similar to rows()-1.\n"
+                  << "  .ilcol()            : Returns the index of the last column (size_t) - similar to cols()-1.\n"
+                  << "  .size()             : Returns the dimensions as a string (e.g., \"3x4\").\n"
+                  << "  .printsize()        : Prints the dimensions (e.g std::cout << \"3x4\").\n"
+                  << "  .is_empty()         : Checks if the matrix is empty.\n"
+                  << "  .is_square()        : Checks if the matrix is square (rows == columns).\n"
+                  << "  .is_scalar()        : Checks if the matrix is scalar (rows==1==columns).\n"
+                  << "  .is_rowvector()     : Checks if the matrix is a row vector (1xN).\n"
+                  << "  .is_colvector()     : Checks if the matrix is a column vector (Nx1).\n"
+                  << "  .is_symmetric()     : Checks if the matrix is symmetric.\n";
+        std::cin.get();
 
-        std::cout << "6. Math operators:\n";
-        std::cout << "   - operator+(const Matrix<T> &other): Matrix addition.\n";
-        std::cout << "   - operator+(T scalar): Adds a scalar to each element of the matrix.\n";
-        std::cout << "   - operator-(const Matrix<T> &other): Matrix subtraction.\n";
-        std::cout << "   - operator-(T scalar): Subtracts a scalar from each element of the matrix.\n";
-        std::cout << "   - operator*(const Matrix<T> &other): Matrix multiplication.\n";
-        std::cout << "   - operator*(T scalar): Multiplies each element of the matrix by a scalar.\n";
-        std::cout << "   - operator/(T scalar): Divides each element of the matrix by a scalar.\n";
-        std::cout << "   - operator/(const Matrix<T> &other): Element-wise division of two matrices.\n";
-        std::cout << "   - operator-() const: Negation of the matrix (multiplies all elements by -1).\n";
-        std::cout << "   - ew_prod(const Matrix<T> &other): Element-wise product of two matrices.\n\n";
+        std::cout << _yellow << "\n[Access and Modification]\n"
+                  << _reset
+                  << "  M(i, j)             : Direct and ultra-fast access (no bounds checking).\n"
+                  << "  M(index)            : Ultra-fast 1D linear access (no bounds checking).\n"
+                  << "  .get(i, j)          : Returns the element with bounds checking (safe/debug).\n"
+                  << "  .get(idx)           : 1D linear access - returns the element with bounds checking (safe/debug).\n"
+                  << "  .set(i, j, val)     : Modifies the element with bounds checking (safe/debug).\n"
+                  << "  .set(idx, val)      : 1D linear access - modifies the element with bounds checking (safe/debug).\n"
+                  << "->obs: these get/set methods accepts negative indexes as in python language.\n"
+                  << "  .getrow(i)          : Returns row 'i' as a copied new matrix (1xN).\n"
+                  << "  .getrows(start,end) : Returns a copy of rows from (start) to (end-1).\n"
+                  << "  .getcol(j)          : Returns column 'j' as a copied new matrix (Nx1).\n"
+                  << "  .getcols(start,end) : Returns a copy of columns from (start) to (end-1).\n"
+                  << "  .rmrow(i)           : Returns a copy removing the i-th row.\n"
+                  << "  .rmrows(start,end)  : Returns a copy removing rows from (start) to (end-1).\n"
+                  << "  .rmcol(j)           : Returns a copy removing the j-th column.\n"
+                  << "  .rmcols(start,end)  : Returns a copy removing rows from (start) to (end-1).\n"
+                  << "  .flatten()          : Returns a row vector with all the entries taken in row-wise way.\n"
+                  << "  .reshape()          : Returns a new shaped matrix with all the entries taken in row-wise way.\n";
+
+        std::cin.get();
+
+        std::cout << _yellow << "\n[Mathematical and Statistical Operations]\n"
+                  << _reset
+                  << "  .t()                : Returns the transposed matrix.\n"
+                  << "  .diag()             : Returns a column with the diagonal elements.\n"
+                  << "  .abs()              : Returns a new matrix with absolute values.\n"
+                  << "  .min(axis=0)        : Returns std::pair {indices, minimum_values}; axis: (0=Cols, 1=Rows).\n"
+                  << "  |_      auto [a,b] = M.min();\n"
+                  << "  .max(axis=0)        : Returns std::pair {indices, maximum_values}; axis: (0=Cols, 1=Rows).\n"
+                  << "  |_      auto [a,b] = M.max();\n"
+                  << "  .sum(axis=0)        : Returns the sum of elements; axis: (0=Cols, 1=Rows).\n"
+                  << "  .sumsum()           : Returns the sum of all entries of the matrix.\n"
+                  << "  .mean(axis=0)       : Returns the mean of elements; axis: (0=Cols, 1=Rows).\n"
+                  << "  .var(axis=0)        : Returns the variance of elements; axis: (0=Cols, 1=Rows).\n"
+                  << "  .std(axis=0)        : Returns the standard deviation; axis: (0=Cols, 1=Rows).\n";
+        std::cin.get();
+
+        std::cout << _yellow << "\n[Input, Output and Debug]\n"
+                  << _reset
+                  << "  std::cout << M                : Prints the formatted matrix to the terminal.\n"
+                  << "  .msg(\"text\")                  : Sets a title to be displayed in the next print or std::cout.\n"
+                  << "  .save_to_file(fname,sep=\";\")  : Saves the matrix in text format (CSV).\n"
+                  << "  .load_from_file(fname)        : Loads the matrix from a text file (CSV).\n"
+                  << "  .save_to_binary(fname)        : Saves the matrix in ultra-fast binary format (.dat).\n"
+                  << "  .load_from_binary(fname)      : Loads the matrix from a binary file (.dat).\n";
+        std::cin.get();
+
+        std::cout << _yellow << "\n[Relational and Logical Operators]\n"
+                  << _reset
+                  << "  M1 == M2            : Returns a Matrixbool (uint8_t) with 1 where elements are equal.\n"
+                  << "  M1 > M2             : Returns a Matrixbool (uint8_t) with 1 where M1 > M2.\n"
+                  << "  M1 < M2             : Returns a Matrixbool (uint8_t) with 1 where M1 < M2.\n"
+                  << "  M1 >= M2            : Returns a Matrixbool (uint8_t) with 1 where M1 >= M2.\n"
+                  << "  M1 <= M2            : Returns a Matrixbool (uint8_t) with 1 where M1 <= M2.\n"
+                  << "  M1 != M2            : Returns a Matrixbool (uint8_t) with 1 where elements are different.\n"
+                  << "  M1 == scalar        : Returns a Matrixbool (uint8_t) with 1 where elements are equal.\n"
+                  << "  M1 > scalar         : Returns a Matrixbool (uint8_t) with 1 where M1 > scalar.\n"
+                  << "  M1 < scalar         : Returns a Matrixbool (uint8_t) with 1 where M1 < scalar.\n"
+                  << "  M1 >= scalar        : Returns a Matrixbool (uint8_t) with 1 where M1 >= scalar.\n"
+                  << "  M1 <= scalar        : Returns a Matrixbool (uint8_t) with 1 where M1 <= scalar.\n"
+                  << "  M1 != scalar        : Returns a Matrixbool (uint8_t) with 1 where M1 != M2.\n"
+                  << "  .is(M2)             : Checks if two matrices point to the same memory address.\n";
+        std::cin.get();
+
+        std::cout << _yellow << "\n[Arithmetic Operators]\n"
+                  << _reset
+                  << "  M1 + M2            : Returns the sum of the matrices.\n"
+                  << "  M1 - M2            : Returns the subtraction of the matrices.\n"
+                  << "  - M                : Returns the negative of the matrix.\n"
+                  << "  M1 * M2            : Returns the product of the matrices.\n"
+                  << "  M1 / M2            : Returns an element-wise division of the matrices.\n"
+                  << "  M.pow(power)       : Returns M raised to a positive power (identity if power is zero).\n"
+                  << "  M1.ew_prod(M2)     : Returns an element-wise product of the matrices.\n"
+                  << "  M + scalar         : Returns the sum with the scalar.\n"
+                  << "  M - scalar         : Returns the subtraction with the scalar.\n"
+                  << "  M * scalar         : Returns the product with the scalar.\n"
+                  << "  scalar / M         : Returns the division with the scalar.\n"
+                  << "  scalar + M         : Returns the sum with the scalar.\n"
+                  << "  scalar - M         : Returns the subtraction with the scalar.\n"
+                  << "  scalar * M         : Returns the product with the scalar.\n"
+                  << "  scalar / M         : Returns the division with the scalar.\n";
+        std::cin.get();
+
+        std::cout << _yellow << "\n[Auxiliary Global Functions]\n"
+                  << _reset
+                  << "  diag(M)             : Returns a square matrix with the diagonal elements of M\n"
+                  << "  |_        (or takes the elements of M into a diagonal, if M is a row or column vector).\n";
+        std::cin.get();
+
+        std::cout << _yellow << "\n[Global Settings]\n"
+                  << _reset
+                  << "   Matrix<T>::set_print_precision(precision)  : Sets the precision of the numbers printed (int).\n"
+                  << "   Matrix<T>::set_print_width(width)          : Sets the width for the numbers printed (int).\n"
+                  << "   Matrix<T>::set_print_color(color_int)      : Sets the color for printing the matrix (int from 1 to 6).\n"
+                  << "   Matrix<T>::set_print_font(style_int)       : Sets the font style for printing the matrix (int from 1 to 9).\n"
+                  << "   Matrix<T>::set_print_debug(debug)          : Sets whether in debug mode or not (bool).\n\n"
+                  << _cyan << "====================================================================\n"
+                  << _reset;
     }
 
     [[nodiscard]] Matrix<T> copy() const
     {
-        Matrix<T> result(rows_, cols_);
-
-        for (size_t i = 0; i < rows_; ++i)
-        {
-            for (size_t j = 0; j < cols_; ++j)
-            {
-                result(i, j) = this->operator()(i, j);
-            }
-        }
-
+        Matrix<T> result = *this;
         return result;
     }
 
@@ -1883,6 +1968,23 @@ public:
         {
             throw std::invalid_argument(_red + "\nMatrix::max() Axis must be 0 or 1.\n" + _reset);
         }
+    }
+
+    Matrix<T> abs(void) const
+    {
+        if constexpr (std::is_unsigned_v<T>)
+        {
+            return *this;
+        }
+        Matrix<T> result = *this;
+        for (size_t i = 0; i < rows(); i++)
+        {
+            for (size_t j = 0; j < cols(); j++)
+            {
+                result(i, j) = (result(i, j) >= 0) ? result(i, j) : -result(i, j);
+            }
+        }
+        return result;
     }
 };
 

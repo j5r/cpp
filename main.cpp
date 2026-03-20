@@ -16,15 +16,15 @@ int main()
     using mxmm = Matrix<size_t>;
     mxmm::set_print_debug(0);
 
-    
-    
-    
-    
-mxi A = gen::randi<int>(4,5,0,10);
-A.print();
-auto [idxi, vali] = A.min(1);
-auto [idxa, vala] = A.max(1);
+    auto A = gen::randi<int>(4,6,0,100).msg("A gen::randi");
+    auto B = A.flatten().msg("B flatten()");
+    auto C = A.reshape(3,8).msg("C reshape(3,8)");
 
+    A.print();
+    B.print();
+    C.print();
+    
+    
 
 
 
