@@ -6,13 +6,15 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <iterator> // para std::distance
 #include <stdexcept>
 #include <iomanip>
 #include <random>
 #include <type_traits>
 #include <typeinfo>
 #include <initializer_list>
-#include "j5rassert.hpp" // Para usar a macro de assert personalizada
+#include <utility>
+#include <iostream>
 
 inline int j5r(size_t seconds = 5)
 {
@@ -27,16 +29,17 @@ inline std::string _green = "\033[32m";   // Verde brilhante
 inline std::string _yellow = "\033[33m";  // Amarelo brilhante
 inline std::string _cyan = "\033[36m";    // Ciano brilhante
 inline std::string _magenta = "\033[35m"; // Magenta brilhante
-inline std::string _reset = "\033[0m";      // Resetar cor
+inline std::string _reset = "\033[0m";    // Resetar cor
 
 inline void not_implemented(const std::string &method_name)
 {
     std::cout << _blue + "\nMethod " + method_name + " is not implemented yet.\n" + _reset;
 }
 
-inline void aqui()
+inline void aqui(auto fname = __FILE__, auto _line = __LINE__)
 {
-    std::cout << _blue + "\nReached the 'aqui()' breakpoint. Press Enter to continue...\n" + _reset;
+    std::cout << _blue + "\nfile::" + std::string(fname) + "::row::" + std::to_string(_line) +
+                     "\nReached the 'aqui(__FILE__, __LINE__)' breakpoint. Press Enter to continue...\n" + _reset;
     std::cin.get();
 }
 
@@ -55,6 +58,11 @@ inline bool isnan_(T value) noexcept { return std::isnan(value); }
 template <typename T>
 class Matrix
 {
+
+    static_assert(!std::is_same_v<T, bool>,
+                  "\033[5;32m\n[MATRIX ERROR]: Matrix<bool> is <<strictly prohibited>>\033[1m due to std::vector<bool> performance overhead. "
+                  "\nPlease use the 'Matrixbool' alias instead!\033[m\n");
+
 private:
     size_t rows_;
     size_t cols_;
@@ -73,6 +81,7 @@ public:
     Matrix() : rows_(0), cols_(0) {}
     Matrix(size_t rows, size_t cols) : rows_(rows), cols_(cols), data_(rows * cols, T()) {}
     Matrix(size_t rows, size_t cols, T initial_value) : rows_(rows), cols_(cols), data_(rows * cols, initial_value) {}
+
     // --- CONSTRUTOR COM LISTA DE INICIALIZAÇÃO ---
 
     Matrix(std::initializer_list<std::initializer_list<T>> list)
@@ -153,6 +162,22 @@ public:
         data_[row * cols_ + col] = value;
     }
 
+    void set(int64_t index, T value)
+    {
+        auto index_in = index;
+        if (index < 0)
+            index += rows() * cols();
+        if (index < 0 || index >= rows() * cols())
+        {
+            int from_index = -rows() * cols();
+            throw std::out_of_range(
+                _red + "Matrix::set() index out of range.\nRange is\n  index[" +
+                std::to_string(from_index) + " (same as first item), " + std::to_string(rows() * cols() - 1) + " (same as last item)],\n  but got index=" +
+                std::to_string(index_in) + "." + _reset);
+        }
+        data_[index] = value;
+    }
+
     T get(int64_t row, int64_t col) const
     {
         auto row_in = row;
@@ -166,12 +191,28 @@ public:
             int from_row = -this->rows();
             int from_col = -this->cols();
             throw std::out_of_range(
-                _red + "Matrix::get() index out of range.\nRange is\n\trow[" +
-                std::to_string(from_row) + " (same as first row), " + std::to_string(ilrow()) + " (same as last row)],\n\tcol[" +
-                std::to_string(from_col) + " (same as first col), " + std::to_string(ilcol()) + " (same as last col)],\n\tbut got [i,j]=[" +
+                _red + "Matrix::get() index out of range.\nRange is\n  row[" +
+                std::to_string(from_row) + " (same as first row), " + std::to_string(ilrow()) + " (same as last row)],\n  col[" +
+                std::to_string(from_col) + " (same as first col), " + std::to_string(ilcol()) + " (same as last col)],\n  but got [i,j]=[" +
                 std::to_string(row_in) + "," + std::to_string(col_in) + "]." + _reset);
         }
         return data_[row * cols_ + col];
+    }
+
+    T get(int64_t index=0)
+    {
+        auto index_in = index;
+        if (index < 0)
+            index += rows() * cols();
+        if (index < 0 || index >= rows() * cols())
+        {
+            int from_index = -rows() * cols();
+            throw std::out_of_range(
+                _red + "Matrix::get() index out of range.\nRange is\n  index[" +
+                std::to_string(from_index) + " (same as first item), " + std::to_string(rows() * cols() - 1) + " (same as last item)],\n  but got index=" +
+                std::to_string(index_in) + "." + _reset);
+        }
+        return data_[index];
     }
 
     // Métodos (As implementações ficam aqui dentro mesmo)
@@ -258,8 +299,7 @@ public:
 
         auto color_msg = color_int != 6 ? _cyan : _magenta;
         std::string color = "\033[" + bold + ";3" + std::to_string(color_int) + "m"; // Azul brilhante
-        j5r_assert(width >= 5,
-                   "\nMatrix::print() Width must be at least 5 characters wide, you provided: " + std::to_string(width) + ".\n");
+
         os << color + "Matrix: (" << m.rows_ << " x " << m.cols_ << ") ";
         if (print_debug_)
         {
@@ -499,15 +539,27 @@ public:
     // --- MÉTODOS DE ACESSO ---
 
     // 1. Versão para leitura e escrita (retorna a referência da memória)
-    T &operator()(size_t row, size_t col) noexcept    {
+    T &operator()(size_t row, size_t col) noexcept
+    {
 
         return data_[row * cols_ + col];
     }
 
     // 2. Versão apenas para leitura (usada quando a matriz é const)
-    const T &operator()(size_t row, size_t col) const noexcept    {
+    const T &operator()(size_t row, size_t col) const noexcept
+    {
 
         return data_[row * cols_ + col];
+    }
+
+    T &operator()(size_t index) noexcept
+    {
+        return data_[index];
+    }
+
+    const T &operator()(size_t index) const noexcept
+    {
+        return data_[index];
     }
 
     // --- MÉTODOS DE ÁLGEBRA LINEAR ---
@@ -1261,11 +1313,24 @@ public:
         return result;
     }
 
-    [[nodiscard]] bool equals(const Matrix<T> &other, T tolerance = static_cast<T>(1e-6)) const
+    [[nodiscard]] bool equals(const Matrix<T> &other, T tolerance = static_cast<T>(1e-8)) const
     {
         if (rows_ != other.rows() || cols_ != other.cols())
         {
             return false;
+        }
+
+        if constexpr (std::is_integral_v<T>)
+        {
+            for (size_t i = 0; i < rows(); i++)
+            {
+                for (size_t j = 0; j < cols(); j++)
+                {
+                    if (this->operator()(i, j) != other(i, j))
+                        return false;
+                }
+            }
+            return true;
         }
 
         T sum_ = T();
@@ -1273,7 +1338,9 @@ public:
         {
             for (size_t j = 0; j < cols_; ++j)
             {
-                T diff = std::abs(this->operator()(i, j) - other(i, j));
+
+                T diff = this->operator()(i, j) - other(i, j);
+                diff = (diff >= 0) ? diff : -diff;
                 sum_ += diff;
                 if (sum_ > tolerance)
                 {
@@ -1679,6 +1746,143 @@ public:
         file.read(reinterpret_cast<char *>(data_.data()), data_.size() * sizeof(T));
 
         file.close();
+    }
+
+    [[nodiscard]] Matrix<T> operator()(const Matrix<uint8_t> &boolMatrix) const
+    {
+        if (boolMatrix.rows() != rows_ || boolMatrix.cols() != cols_)
+        {
+            throw std::out_of_range(
+                _red +
+                "Matrix::operator() boolMatrix has not a compatible size. It has " + boolMatrix.size() + " vs matrix size " + size() + ".");
+        }
+
+        Matrix<T> result;
+
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = 0; j < cols_; j++)
+            {
+                if (boolMatrix(i, j))
+                {
+                    result.data_.push_back(this->operator()(i, j));
+                    result.cols_ += 1;
+                    result.rows_ = 1;
+                }
+            }
+        }
+        return result;
+    }
+
+    [[nodiscard]] std::pair<Matrix<size_t>, Matrix<T>> min(uint8_t axis = 0) const
+    {
+        if (axis == 0) // Mínimo de cada COLUNA (Resulta em 1xCols)
+        {
+            Matrix<size_t> result_idx(1, cols());
+            Matrix<T> result_val(1, cols());
+
+            for (size_t j = 0; j < cols(); j++)
+            {
+                size_t best_idx = 0;
+                T min_val = this->operator()(0, j); // Assume que o primeiro é o menor
+
+                for (size_t i = 1; i < rows(); i++)
+                {
+                    if (this->operator()(i, j) < min_val)
+                    {
+                        min_val = this->operator()(i, j);
+                        best_idx = i;
+                    }
+                }
+                result_idx(0, j) = best_idx;
+                result_val(0, j) = min_val;
+            }
+
+            return {result_idx.msg("min idx | axis = " + std::to_string(axis)),
+                    result_val.msg("min val | axis = " + std::to_string(axis))};
+        }
+        else if (axis == 1) // Mínimo de cada LINHA (Resulta em Rowsx1)
+        {
+            // CORREÇÃO 1: Mudado de Matrix<int> para Matrix<size_t>
+            Matrix<size_t> result_idx(rows(), 1);
+            Matrix<T> result_val(rows(), 1);
+
+            for (size_t i = 0; i < rows(); i++)
+            {
+                auto row_start = data_.begin() + (i * cols());
+                auto row_end = row_start + cols();
+
+                auto it_min = std::min_element(row_start, row_end);
+                size_t best_idx = std::distance(row_start, it_min);
+
+                result_idx(i, 0) = best_idx;
+                // CORREÇÃO 2: Adicionado o asterisco (*) para pegar o valor do iterador
+                result_val(i, 0) = *it_min;
+            }
+
+            return {result_idx.msg("min idx | axis = " + std::to_string(axis)),
+                    result_val.msg("min val | axis = " + std::to_string(axis))};
+        }
+        else
+        {
+            throw std::invalid_argument(_red + "\nMatrix::min() Axis must be 0 or 1.\n" + _reset);
+        }
+    }
+
+    [[nodiscard]] std::pair<Matrix<size_t>, Matrix<T>> max(uint8_t axis = 0) const
+    {
+        if (axis == 0) // Máximo de cada COLUNA (Resulta em 1xCols)
+        {
+            Matrix<size_t> result_idx(1, cols());
+            Matrix<T> result_val(1, cols());
+
+            for (size_t j = 0; j < cols(); j++)
+            {
+                size_t best_idx = 0;
+                T max_val = this->operator()(0, j); // Assume que o primeiro é o maior
+
+                for (size_t i = 1; i < rows(); i++)
+                {
+                    // A única diferença para o min() é este sinal de MAIOR (>)
+                    if (this->operator()(i, j) > max_val)
+                    {
+                        max_val = this->operator()(i, j);
+                        best_idx = i;
+                    }
+                }
+                result_idx(0, j) = best_idx;
+                result_val(0, j) = max_val;
+            }
+
+            return {result_idx.msg("max idx | axis = " + std::to_string(axis)),
+                    result_val.msg("max val | axis = " + std::to_string(axis))};
+        }
+        else if (axis == 1) // Máximo de cada LINHA (Resulta em Rowsx1)
+        {
+            Matrix<size_t> result_idx(rows(), 1);
+            Matrix<T> result_val(rows(), 1);
+
+            for (size_t i = 0; i < rows(); i++)
+            {
+                // Como as linhas estão juntas na memória, usamos iteradores!
+                auto row_start = data_.begin() + (i * cols());
+                auto row_end = row_start + cols();
+
+                // Usamos std::max_element da biblioteca <algorithm>
+                auto it_max = std::max_element(row_start, row_end);
+                size_t best_idx = std::distance(row_start, it_max);
+
+                result_idx(i, 0) = best_idx;
+                result_val(i, 0) = *it_max; // Desreferencia o iterador para obter o valor
+            }
+
+            return {result_idx.msg("max idx | axis = " + std::to_string(axis)),
+                    result_val.msg("max val | axis = " + std::to_string(axis))};
+        }
+        else
+        {
+            throw std::invalid_argument(_red + "\nMatrix::max() Axis must be 0 or 1.\n" + _reset);
+        }
     }
 };
 

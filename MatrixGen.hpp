@@ -26,7 +26,8 @@ private:
       gen.seed(static_cast<unsigned int>(seed));
     }
     return gen;
-  } 
+  }
+
 
 public:
   static void set_random_seed(int s) { seed = s; }
