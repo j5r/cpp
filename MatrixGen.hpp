@@ -28,7 +28,6 @@ private:
     return gen;
   }
 
-
 public:
   static void set_random_seed(int s) { seed = s; }
   static void unfreeze_seed() { seed = -1; }
@@ -39,6 +38,7 @@ public:
     static_assert(std::is_floating_point<T>::value, _red + "\nMatrix::rand() Method requires float or double types of matrix.\n" + _reset);
 
     Matrix<T> result(nrows, ncols);
+    result.msg("MatrixGen::rand(min=" + std::to_string(min_value) + ", max=" + std::to_string(max_value) + ")");
 
     auto gen = create_engine();
 
@@ -61,6 +61,7 @@ public:
     static_assert(std::is_floating_point<T>::value, _red + "\nMatrix::exprand() Method requires float or double types of matrix.\n" + _reset);
 
     Matrix<T> result(nrows, ncols);
+    result.msg("MatrixGen::exprand(lambda=" + std::to_string(lambda) + ")");
 
     auto gen = create_engine();
 
@@ -83,6 +84,7 @@ public:
     static_assert(std::is_floating_point<T>::value, _red + "\nMatrix::randn() Method requires float or double types of matrix.\n" + _reset);
 
     Matrix<T> result(nrows, ncols);
+    result.msg("MatrixGen::randn()");
 
     auto gen = create_engine();
 
@@ -103,6 +105,7 @@ public:
   static Matrix<T> eye(size_t nrows, size_t ncols = 1, int shift = 0)
   {
     Matrix<T> result(nrows, ncols);
+    result.msg("MatrixGen::eye()");
 
     // [Descobre qual é a menor dimensão para não tentar escrever fora da matriz]
     size_t limit = std::min(nrows, ncols);
@@ -123,6 +126,7 @@ public:
     static_assert(std::is_integral<T>::value, _red + "\nMatrix::randint() Method requires integer types of matrix.\n" + _reset);
 
     Matrix<T> result(nrows, ncols);
+    result.msg("MatrixGen::randi(min=" + std::to_string(min_value) + ", max=" + std::to_string(max_value) + ")");
 
     auto gen = create_engine();
 
@@ -139,10 +143,38 @@ public:
   }
 
   template <typename T>
-  static Matrix<size_t> randd(const Matrix<T> &distrib, size_t nrows, size_t ncols = 1)
+  static Matrix<size_t> randd(const Matrix<T> &distribution, size_t nrows, size_t ncols = 1)
   {
-    auto sum_up_to_one = distrib.sum().sum(1).operator()(0, 0);
+    if constexpr (!std::is_floating_point_v<T>)
+    {
+      throw std::invalid_argument(_red + "MatrixGen::randd() Distribution must be floating point type." + _reset);
+    }
+    auto distrib = distribution;
+    auto sum_up_to_one = distrib.abs().sumsum();
+    if (sum_up_to_one == T())
+    {
+      throw std::invalid_argument(
+          _red + "MatrixGen::randd() Distribution must not sum up to zero." + _reset);
+    }
+    if (sum_up_to_one != T(1))
+    {
+      distrib = distrib.abs() / sum_up_to_one;
+    }
+    distrib = distrib.flatten().cumsum(1);
 
-    Matrix<size_t> result(nrows, ncols);
+    Matrix<size_t> result(1, nrows * ncols);
+    auto rand_matrix = MatrixGen::rand<float>(1, nrows * ncols);
+
+    float r = 0;
+    for (size_t index = 0; index < nrows * ncols; index++)
+    {
+      r = rand_matrix(index);
+      auto bool_row = (distrib >= r);
+      auto [max_index, _] = bool_row.max(1);
+      std::ignore = _;
+      result(index) = max_index(0);
+    }
+    return result.reshape(nrows,ncols).msg("MatrixGen::randd()");
+    
   }
 };

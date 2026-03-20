@@ -645,6 +645,45 @@ public:
         return temp(0, 0);
     }
 
+    [[nodiscard]] Matrix<T> cumsum(uint8_t axis = 0) const
+    {
+        if (axis != 0 && axis != 1)
+        {
+            throw std::invalid_argument(
+                _red + "Matrix::cumsum() Error: Axis must be 0 or 1." + _reset);
+        }
+        
+        Matrix<T> result = *this;
+        result.msg("cumsum()");
+
+        if (axis == 0)
+        {
+            for (size_t i = 0; i < rows(); i++)
+            {
+                if (rows() > 1 && i == 0)
+                    continue;
+                for (size_t j = 0; j < cols(); j++)
+                {
+                    result(i, j) += result(i - 1, j);
+                }
+            }
+            return result;
+        }
+        else
+        {
+            for (size_t j = 0; j < cols(); j++)
+            {
+                if (cols() > 1 && j == 0)
+                    continue;
+                for (size_t i = 0; i < rows(); i++)
+                {
+                    result(i, j) += result(i, j - 1);
+                }
+            }
+            return result;
+        }
+    }
+
     [[nodiscard]] Matrix<T> mean(uint8_t axis = 0) const noexcept
     {
         Matrix<T> sum_result = this->sum(axis);
@@ -893,7 +932,7 @@ public:
     {
         Matrix<T> result = *this;
         result.rows_ = 1;
-        result.cols_ = rows()*cols();
+        result.cols_ = rows() * cols();
         return result;
     }
 

@@ -12,18 +12,18 @@ int main()
     using gen = MatrixGen;
     using mx = Matrix<double>;
     using mxi = Matrix<int>;
-    using mxb = Matrixbool;
-    using mxmm = Matrix<size_t>;
-    mxmm::set_print_debug(0);
 
-    auto A = gen::randi<int>(4,6,0,100).msg("A gen::randi");
-    auto B = A.flatten().msg("B flatten()");
-    auto C = A.reshape(3,8).msg("C reshape(3,8)");
-
-    A.print();
-    B.print();
-    C.print();
+    mx d = {{30,20,1,5}};
+    mxi vl = {{0,1,2,3}};
+    d = d/d.sumsum();
+    (d * vl.t()).msg("expected value").print();
     
+    
+    auto A = gen::randd(d,10,500000) + float(0);
+    d.print();
+    A.print();
+    A.mean(1).print();
+
     
 
 
