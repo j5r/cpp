@@ -12,14 +12,15 @@ int main()
     using gen = MatrixGen;
     using mx = Matrix<double>;
     using mxi = Matrix<int>;
+ 
 
-    mx A = {{1,2,3},{2,3,4}};
-    mx B;
-   
-    A.print("A");
-    A /= B;
-    A.print("1");
-    
+ auto A = gen::rand<float>(3,4,-10,10);
+ 
+ A.print("A rand -10,10\n");
+ A.round().print("A round\n");
+ A.floor().print("A floor\n");
+ A.ceil().print("A ceil\n");
+
 
 
 

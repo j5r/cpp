@@ -1421,6 +1421,10 @@ public:
                   << "====================================================================\n"
                   << _reset
 
+                  << _green << "\nIn the following, ``!`` marks operations that modify the Matrix object, so be carefull.\n"
+                  << "The operations without ``!`` work with a copy of the Matrix.\nType ENTER to go to the next part of the help.\n"
+                  << _reset
+
                   << _yellow << "\n[Constructors]\n"
                   << _reset
                   << "   Matrix<T> m;                      : Empty matrix.\n"
@@ -1451,12 +1455,12 @@ public:
 
         std::cout << _yellow << "\n[Access and Modification]\n"
                   << _reset
-                  << "  M(i, j)             : Direct and ultra-fast access (no bounds checking).\n"
-                  << "  M(index)            : Ultra-fast 1D linear access (no bounds checking).\n"
+                  << "  !M(i, j)            : Direct and ultra-fast access (no bounds checking).\n"
+                  << "  !M(index)           : Ultra-fast 1D linear row-wise access (no bounds checking).\n"
                   << "  .get(i, j)          : Returns the element with bounds checking (safe/debug).\n"
-                  << "  .get(idx)           : 1D linear access - returns the element with bounds checking (safe/debug).\n"
-                  << "  .set(i, j, val)     : Modifies the element with bounds checking (safe/debug).\n"
-                  << "  .set(idx, val)      : 1D linear access - modifies the element with bounds checking (safe/debug).\n"
+                  << "  .get(idx)           : 1D linear row-wise access - returns the element with bounds checking (safe/debug).\n"
+                  << "  !.set(i, j, val)    : Modifies the element with bounds checking (safe/debug).\n"
+                  << "  !.set(idx, val)     : 1D linear row-wise access - modifies the element with bounds checking (safe/debug).\n"
                   << "->obs: these get/set methods accepts negative indexes as in python language.\n"
                   << "  .getrow(i)          : Returns row 'i' as a copied new matrix (1xN).\n"
                   << "  .getrows(start,end) : Returns a copy of rows from (start) to (end-1).\n"
@@ -1490,9 +1494,10 @@ public:
         std::cout << _yellow << "\n[Input, Output and Debug]\n"
                   << _reset
                   << "  std::cout << M                : Prints the formatted matrix to the terminal.\n"
-                  << "  .msg(\"text\")                  : Sets a title to be displayed in the next print or std::cout.\n"
+                  << "  !.msg(\"text\")                 : Sets a title to be displayed in the next .print() or std::cout.\n"
+                  << "  .print(appendix=\"\")           : Prints the matrix with an appendix string at the end.\n"
                   << "  .save_to_file(fname,sep=\";\")  : Saves the matrix in text format (CSV).\n"
-                  << "  .load_from_file(fname)        : Loads the matrix from a text file (CSV).\n"
+                  << "  .load_from_file(fname,sep=\";\") : Loads the matrix from a text file (CSV).\n"
                   << "  .save_to_binary(fname)        : Saves the matrix in ultra-fast binary format (.dat).\n"
                   << "  .load_from_binary(fname)      : Loads the matrix from a binary file (.dat).\n";
         std::cin.get();
@@ -2173,6 +2178,48 @@ public:
                     this->operator()(i, j) /= scalar;
             }
         }
+    }
+
+    Matrix<T> round()const {
+        if constexpr (std::is_integral_v<T>)
+        {
+            throw std::exception(_red+"Matrix::round() Integral types are not allowed to invoke .round() method."+_reset);
+        }
+        Matrix<T> result = *this;
+        for(size_t i=0; i<rows();i++){
+            for(size_t j=0; j<cols();j++){
+                result(i,j) = std::round(result(i,j));
+            }
+        }
+        return result;
+    }
+
+    Matrix<T> ceil()const {
+        if constexpr (std::is_integral_v<T>)
+        {
+            throw std::exception(_red+"Matrix::ceil() Integral types are not allowed to invoke .ceil() method."+_reset);
+        }
+        Matrix<T> result = *this;
+        for(size_t i=0; i<rows();i++){
+            for(size_t j=0; j<cols();j++){
+                result(i,j) = std::ceil(result(i,j));
+            }
+        }
+        return result;
+    }
+
+    Matrix<T> floor()const {
+        if constexpr (std::is_integral_v<T>)
+        {
+            throw std::exception(_red+"Matrix::floor() Integral types are not allowed to invoke .floor() method."+_reset);
+        }
+        Matrix<T> result = *this;
+        for(size_t i=0; i<rows();i++){
+            for(size_t j=0; j<cols();j++){
+                result(i,j) = std::floor(result(i,j));
+            }
+        }
+        return result;
     }
 };
 
