@@ -1,5 +1,6 @@
 #pragma once
 #include "Matrix.hpp"
+#include "MatrixShape.hpp"
 
 class MatrixLinAlg
 {
@@ -45,7 +46,6 @@ public:
     return result;
   }
 
-
   template <typename T>
   static bool _pivot(Matrix<T> &m, size_t pivot_row, size_t pivot_col)
   {
@@ -75,5 +75,12 @@ public:
     }
     return true;
   }
-  
+
+  template <typename T>
+  Matrix<T> gauss_el(const Matrix<T>&m, const Matrix<T>&b){
+    auto augmented_m = MatrixShape::addcols(m,1);
+    //MatrixShape::replacecols
+    not_implemented("MatrixLinAlg::gauss_el()");
+    return augmented_m;
+  }
 };

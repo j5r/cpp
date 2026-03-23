@@ -13,16 +13,15 @@ int main()
     using mx = Matrix<double>;
     using mxi = Matrix<int>;
 
-    mx d = {{30,20,1,5}};
-    mxi vl = {{0,1,2,3}};
-    d = d/d.sumsum();
-    (d * vl.t()).msg("expected value").print();
+    mx A = {{1,2,3},{2,3,4}};
+    mx B;
+   
+    A.print("A");
+    A /= B;
+    A.print("1");
     
-    
-    auto A = gen::randd(d,10,500000) + float(0);
-    d.print();
-    A.print();
-    A.mean(1).print();
+
+
 
     
 

@@ -264,7 +264,6 @@ public:
         }
 
         Matrix<T> result = m;
-
         for (size_t i = 0; i < new_rows.rows(); ++i)
         {
             for (size_t j = 0; j < m.cols(); ++j)
@@ -272,7 +271,25 @@ public:
                 result(index + i, j) = new_rows(i, j);
             }
         }
+        return result;
+    }
 
+    template <typename T>
+    static Matrix<T> replacecols(const Matrix<T> &m, size_t index, const Matrix<T> &new_cols)
+    {
+        if (index + new_cols.cols() > m.cols())
+        {
+            throw std::invalid_argument(_red + "\nMatrixShape::replacecols() Error: Replacement rows exceed matrix dimensions.\n" + _reset);
+        }
+
+        Matrix<T> result = m;
+        for (size_t j = 0; j < new_cols.cols(); ++j)
+        {
+            for (size_t i = 0; i < m.rows(); ++i)
+            {
+                result(i, index + j) = new_cols(i, j);
+            }
+        }
         return result;
     }
 };

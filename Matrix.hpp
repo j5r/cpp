@@ -652,7 +652,7 @@ public:
             throw std::invalid_argument(
                 _red + "Matrix::cumsum() Error: Axis must be 0 or 1." + _reset);
         }
-        
+
         Matrix<T> result = *this;
         result.msg("cumsum()");
 
@@ -2024,6 +2024,155 @@ public:
             }
         }
         return result;
+    }
+
+    void operator+=(const Matrix<T> &other)
+    {
+        if (other.is_scalar())
+        {
+            this->operator+=(other(0));
+            return;
+        }
+
+        if (is_scalar() && (!other.is_scalar()))
+        {
+            T scalar = this->operator()(0);
+            *this = other;
+            this->operator+=(scalar);
+            return;
+        }
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "Matrix::operator+=() Matrices must have the same dimensions for adding, or be a scalar matrix." +
+                                        "\nGot " + size() + " vs " + other.size() + "." + _reset);
+        }
+
+        Matrix<T> result = ((*this) + other);
+        *this = result;
+    }
+
+    void operator-=(const Matrix<T> &other)
+    {
+        if (other.is_scalar())
+        {
+            this->operator-=(other(0));
+            return;
+        }
+
+        if (is_scalar() && (!other.is_scalar()))
+        {
+            T scalar = this->operator()(0);
+            *this = -other;
+            this->operator+=(scalar);
+            return;
+        }
+
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "Matrix::operator-=() Matrices must have the same dimensions for subtracting, or be a scalar matrix." +
+                                        "\nGot " + size() + " vs " + other.size() + "." + _reset);
+        }
+
+        Matrix<T> result = operator-(other);
+        *this = result;
+    }
+
+    void operator*=(const Matrix<T> &other)
+    {
+        if (other.is_scalar())
+        {
+            this->operator*=(other(0));
+            return;
+        }
+
+        if (is_scalar() && (!other.is_scalar()))
+        {
+            T scalar = this->operator()(0);
+            *this = other;
+            this->operator*=(scalar);
+            return;
+        }
+
+        if (cols_ != other.rows())
+        {
+            throw std::invalid_argument(_red +
+                                        "Matrix::operator*=() Matrices must have compatible dimensions for multiplying, or be a scalar matrix." +
+                                        "\nGot " + size() + " vs " + other.size() + "." + _reset);
+        }
+
+        Matrix<T> result = ((*this) * other);
+        *this = result;
+    }
+
+    void operator/=(const Matrix<T> &other)
+    {
+        if (other.is_scalar())
+        {
+            this->operator/=(other(0));
+            return;
+        }
+
+        if (is_scalar() && (!other.is_scalar()))
+        {
+            Matrix<T> result = ((*this) / other);
+            *this = result;
+            return;
+        }
+
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "Matrix::operator/=() Matrices must have the same dimensions for element-wise division, or be a scalar matrix." +
+                                        "\nGot " + size() + " vs " + other.size() + "." + _reset);
+        }
+
+        Matrix<T> result = ((*this) / other);
+        *this = result;
+    }
+
+    void operator+=(T scalar) noexcept
+    {
+        for (size_t i = 0; i < rows(); i++)
+        {
+            for (size_t j = 0; j < cols(); j++)
+                this->operator()(i, j) += scalar;
+        }
+    }
+
+    void operator-=(T scalar) noexcept
+    {
+        for (size_t i = 0; i < rows(); i++)
+        {
+            for (size_t j = 0; j < cols(); j++)
+                this->operator()(i, j) -= scalar;
+        }
+    }
+
+    void operator*=(T scalar) noexcept
+    {
+        for (size_t i = 0; i < rows(); i++)
+        {
+            for (size_t j = 0; j < cols(); j++)
+                this->operator()(i, j) *= scalar;
+        }
+    }
+
+    void operator/=(T scalar) noexcept
+    {
+        if constexpr (std::is_integral_v<T>)
+        {
+            throw std::invalid_argument(_red + "Matrix::operator/=() Integral types are not allowed to divide.\nTry Matrix<floating point> instead." + _reset);
+        }
+        else
+        {
+            for (size_t i = 0; i < rows(); i++)
+            {
+                for (size_t j = 0; j < cols(); j++)
+                    this->operator()(i, j) /= scalar;
+            }
+        }
     }
 };
 
