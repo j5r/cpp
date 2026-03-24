@@ -12,16 +12,22 @@ int main()
     using gen = MatrixGen;
     using mx = Matrix<double>;
     using mxi = Matrix<int>;
-    mx::set_print_precision(2);
-    mx::set_print_width(2);
+    //mx::set_print_precision(2);
+    //mx::set_print_width(2);
  
 
- mx A = {{1,2,3},{4,5,6},{7,8,3}};
- mx b = {{14},{32},{32}};
+ mx A = {{1,2,3},{4,5,6},{7,8,3},{10,11,11},{90,180,-200}};
  A.print();
- b.print();
- mx c = alg::gmres(A,b);
- c.print();
+ auto [U,S,V] = alg::svd(A);
+ U.print();
+ S.print();
+ V.print();
+ auto res = A - U * S * V.t();
+ 
+ res.msg("matriz residual").print();
+ std::cout << "residuo norma " << alg::norm(res) << "\n";
+std::cout << "rank " << alg::rank(A) << "\n";
+ 
 
 
 
