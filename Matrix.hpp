@@ -796,7 +796,8 @@ public:
     {
         if (start >= cols_ || end > cols_ || start >= end)
         {
-            throw std::out_of_range(_red + "\nMatrix::getcols() Error: Invalid column indices. Got start=" +
+            throw std::out_of_range(_red + "\nMatrix::getcols() Error: Invalid column indices. The size is "+size()
+                +".\nGot start=" +
                                     std::to_string(start) + " and end=" + std::to_string(end) + "." + _reset);
         }
 
@@ -962,7 +963,7 @@ public:
     }
 
     template <typename U>
-    auto operator+(U scalar) const
+    [[nodiscard]] auto operator+(U scalar) const
     {
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
@@ -979,7 +980,7 @@ public:
     }
 
     template <typename U>
-    auto operator-(const Matrix<U> &other) const
+    [[nodiscard]] auto operator-(const Matrix<U> &other) const
     {
         if (other.is_scalar())
         {
@@ -1004,7 +1005,7 @@ public:
     }
 
     template <typename U>
-    auto operator-(U scalar) const
+    [[nodiscard]] auto operator-(U scalar) const
     {
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
@@ -1021,7 +1022,7 @@ public:
     }
 
     template <typename U>
-    auto operator*(const Matrix<U> &other) const
+    [[nodiscard]] auto operator*(const Matrix<U> &other) const
     {
         if (other.is_scalar())
         {
@@ -1035,16 +1036,12 @@ public:
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, other.cols());
 
-        for (size_t i = 0; i < rows_; ++i)
-        {
-            for (size_t j = 0; j < other.cols(); ++j)
-            {
-                ResultType sum = ResultType();
-                for (size_t k = 0; k < cols_; ++k)
-                {
-                    sum += this->operator()(i, k) * other(k, j);
+        for (size_t i = 0; i < rows_; i++) {
+            for (size_t k = 0; k < cols_; k++) {
+                ResultType temp = this->operator()(i, k);
+                for (size_t j = 0; j < other.cols(); j++) {
+                    result(i, j) += temp * other(k, j);
                 }
-                result(i, j) = sum;
             }
         }
 
@@ -1052,7 +1049,7 @@ public:
     }
 
     template <typename U>
-    auto operator*(U scalar) const
+    [[nodiscard]] auto operator*(U scalar) const
     {
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
@@ -1236,36 +1233,34 @@ public:
 
     // [friend: declara uma função não-membro que tem acesso direto aos dados da classe]
     template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
-    friend auto operator+(const U &scalar, const Matrix &m)
+    friend auto operator+(const U &scalar, const Matrix<T> &m) -> Matrix<std::common_type_t<U, T>>
     {
         return m + scalar;
     }
 
     // [Opcional: Exemplo para subtração, onde a ordem importa muito]
     template <typename U>
-    friend auto operator-(const U &scalar, const Matrix &m)
+    friend auto operator-(const U &scalar, const Matrix<T> &m) -> Matrix<std::common_type_t<U, T>>
     {
         using ResultType = std::common_type_t<U, T>;
         Matrix<ResultType> result(m.rows(), m.cols());
 
-        for (size_t i = 0; i < m.rows(); ++i)
+        for (size_t i = 0; i < m.rows()*m.cols(); ++i)
         {
-            for (size_t j = 0; j < m.cols(); ++j)
-            {
-                result(i, j) = scalar - m(i, j); // Aqui a ordem dita a matemática correta
-            }
+                result(i) = scalar - m(i); // Aqui a ordem dita a matemática correta
+            
         }
         return result;
     }
 
     template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
-    friend auto operator*(const U &scalar, const Matrix &m)
+    friend auto operator*(const U &scalar, const Matrix<T> &m) -> Matrix<std::common_type_t<U, T>>
     {
         return m * scalar;
     }
 
     template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
-    friend auto operator/(const U &scalar, const Matrix &m)
+    friend auto operator/(const U &scalar, const Matrix<T> &m) -> Matrix<std::common_type_t<U, T>>
     {
         using ResultType = std::common_type_t<U, T>;
         Matrix<ResultType> result(m.rows(), m.cols());
@@ -1382,7 +1377,13 @@ public:
 
         return true;
     }
-    [[nodiscard]] Matrix<T> operator-() const { return 0 - (*this); }
+    [[nodiscard]] Matrix<T> operator-() const { 
+        Matrix<T> result(rows_, cols_);
+        for (size_t i = 0; i < data_.size(); i++) {
+            result.data_[i] = -data_[i];
+        }
+        return result;
+     }
 
     [[nodiscard]] Matrix<T> ew_prod(const Matrix<T> &other) const
     {
@@ -2031,12 +2032,12 @@ public:
         return result;
     }
 
-    void operator+=(const Matrix<T> &other)
+    Matrix<T>& operator+=(const Matrix<T> &other)
     {
         if (other.is_scalar())
         {
             this->operator+=(other(0));
-            return;
+            return *this;
         }
 
         if (is_scalar() && (!other.is_scalar()))
@@ -2044,7 +2045,7 @@ public:
             T scalar = this->operator()(0);
             *this = other;
             this->operator+=(scalar);
-            return;
+            return *this;
         }
         if (rows_ != other.rows() || cols_ != other.cols())
         {
@@ -2055,14 +2056,15 @@ public:
 
         Matrix<T> result = ((*this) + other);
         *this = result;
+        return *this;
     }
 
-    void operator-=(const Matrix<T> &other)
+    Matrix<T>& operator-=(const Matrix<T> &other)
     {
         if (other.is_scalar())
         {
             this->operator-=(other(0));
-            return;
+            return *this;
         }
 
         if (is_scalar() && (!other.is_scalar()))
@@ -2070,7 +2072,7 @@ public:
             T scalar = this->operator()(0);
             *this = -other;
             this->operator+=(scalar);
-            return;
+            return *this;
         }
 
         if (rows_ != other.rows() || cols_ != other.cols())
@@ -2082,14 +2084,15 @@ public:
 
         Matrix<T> result = operator-(other);
         *this = result;
+        return *this;
     }
 
-    void operator*=(const Matrix<T> &other)
+    Matrix<T>& operator*=(const Matrix<T> &other)
     {
         if (other.is_scalar())
         {
             this->operator*=(other(0));
-            return;
+            return *this;
         }
 
         if (is_scalar() && (!other.is_scalar()))
@@ -2097,7 +2100,7 @@ public:
             T scalar = this->operator()(0);
             *this = other;
             this->operator*=(scalar);
-            return;
+            return *this;
         }
 
         if (cols_ != other.rows())
@@ -2109,21 +2112,22 @@ public:
 
         Matrix<T> result = ((*this) * other);
         *this = result;
+        return *this;
     }
 
-    void operator/=(const Matrix<T> &other)
+    Matrix<T>& operator/=(const Matrix<T> &other)
     {
         if (other.is_scalar())
         {
             this->operator/=(other(0));
-            return;
+            return *this;
         }
 
         if (is_scalar() && (!other.is_scalar()))
         {
             Matrix<T> result = ((*this) / other);
             *this = result;
-            return;
+            return *this;
         }
 
         if (rows_ != other.rows() || cols_ != other.cols())
@@ -2135,36 +2139,40 @@ public:
 
         Matrix<T> result = ((*this) / other);
         *this = result;
+        return *this;
     }
 
-    void operator+=(T scalar) noexcept
+    Matrix<T>& operator+=(T scalar) noexcept
     {
         for (size_t i = 0; i < rows(); i++)
         {
             for (size_t j = 0; j < cols(); j++)
                 this->operator()(i, j) += scalar;
         }
+        return *this;
     }
 
-    void operator-=(T scalar) noexcept
+    Matrix<T>& operator-=(T scalar) noexcept
     {
         for (size_t i = 0; i < rows(); i++)
         {
             for (size_t j = 0; j < cols(); j++)
                 this->operator()(i, j) -= scalar;
         }
+        return *this;
     }
 
-    void operator*=(T scalar) noexcept
+    Matrix<T>& operator*=(T scalar) noexcept
     {
         for (size_t i = 0; i < rows(); i++)
         {
             for (size_t j = 0; j < cols(); j++)
                 this->operator()(i, j) *= scalar;
         }
+        return *this;
     }
 
-    void operator/=(T scalar) noexcept
+    Matrix<T>& operator/=(T scalar) noexcept
     {
         if constexpr (std::is_integral_v<T>)
         {
@@ -2178,6 +2186,7 @@ public:
                     this->operator()(i, j) /= scalar;
             }
         }
+        return *this;
     }
 
     Matrix<T> round()const {

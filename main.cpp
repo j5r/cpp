@@ -12,14 +12,17 @@ int main()
     using gen = MatrixGen;
     using mx = Matrix<double>;
     using mxi = Matrix<int>;
+    mx::set_print_precision(2);
+    mx::set_print_width(2);
  
 
- auto A = gen::rand<float>(3,4,-10,10);
- 
- A.print("A rand -10,10\n");
- A.round().print("A round\n");
- A.floor().print("A floor\n");
- A.ceil().print("A ceil\n");
+ mx A = {{1,2,3},{4,5,6},{7,8,3}};
+ mx b = {{14},{32},{32}};
+ A.print();
+ b.print();
+ mx c = alg::gmres(A,b);
+ c.print();
+
 
 
 
