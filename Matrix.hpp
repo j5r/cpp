@@ -15,6 +15,38 @@
 #include <initializer_list>
 #include <utility>
 #include <iostream>
+#include <sstream>
+#define PI 3.14159265358979323846264338327950288419716939937510
+
+template <typename T>
+class Matrix;
+
+class ostringstream_extension : public std::ostringstream
+{
+public:
+    using std::ostringstream::ostringstream; // herda construtores
+
+    std::string operator()() const
+    {
+        return this->str();
+    }
+    std::string get() const { return (*this)(); }
+
+    template <typename T>
+    Matrix<T> &operator()(Matrix<T> &m)
+    {
+        m.msg(get());
+        return m;
+    }
+};
+
+inline ostringstream_extension strcc; // string concatenator like std::cout;
+// example
+//   strcc << "text " << 23 << " other text";
+// to get the resulting string there are three options:
+//   strcc.str();    //gets the string "text 23 other text"
+//   strcc.get();    //gets the string "text 23 other text"
+//   strcc();        //gets the string "text 23 other text"
 
 inline int j5r(size_t seconds = 5)
 {
@@ -137,7 +169,22 @@ public:
     bool is_scalar() const noexcept { return rows_ == 1 && cols_ == 1; }
     bool is_rowvector() const noexcept { return rows_ == 1 && cols_ > 1; }
     bool is_colvector() const noexcept { return cols_ == 1 && rows_ > 1; }
-    bool is_symmetric() const noexcept { return this->is_square() && (this->equals(this->t())); }
+    bool is_vector() const noexcept { return is_colvector() || is_rowvector();}
+    size_t numel() const noexcept { return rows_*cols_;}
+    bool is_symmetric() const noexcept
+    {
+        if (!is_square())
+            return false;
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t j = i + 1; j < cols_; j++)
+            {
+                if (std::abs(this->operator()(i, j) - this->operator()(j, i)) > 1e-14)
+                    return false;
+            }
+        }
+        return true;
+    }
 
     Matrix<T> &msg(const std::string &comment) noexcept
     {
@@ -796,8 +843,7 @@ public:
     {
         if (start >= cols_ || end > cols_ || start >= end)
         {
-            throw std::out_of_range(_red + "\nMatrix::getcols() Error: Invalid column indices. The size is "+size()
-                +".\nGot start=" +
+            throw std::out_of_range(_red + "\nMatrix::getcols() Error: Invalid column indices. The size is " + size() + ".\nGot start=" +
                                     std::to_string(start) + " and end=" + std::to_string(end) + "." + _reset);
         }
 
@@ -1036,10 +1082,13 @@ public:
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, other.cols());
 
-        for (size_t i = 0; i < rows_; i++) {
-            for (size_t k = 0; k < cols_; k++) {
+        for (size_t i = 0; i < rows_; i++)
+        {
+            for (size_t k = 0; k < cols_; k++)
+            {
                 ResultType temp = this->operator()(i, k);
-                for (size_t j = 0; j < other.cols(); j++) {
+                for (size_t j = 0; j < other.cols(); j++)
+                {
                     result(i, j) += temp * other(k, j);
                 }
             }
@@ -1054,12 +1103,10 @@ public:
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
 
-        for (size_t i = 0; i < rows_; ++i)
+        for (size_t i = 0; i < rows_*cols_; ++i)
         {
-            for (size_t j = 0; j < cols_; ++j)
-            {
-                result(i, j) = this->operator()(i, j) * scalar;
-            }
+                result(i) = (*this)(i) * scalar;
+            
         }
 
         return result;
@@ -1245,10 +1292,9 @@ public:
         using ResultType = std::common_type_t<U, T>;
         Matrix<ResultType> result(m.rows(), m.cols());
 
-        for (size_t i = 0; i < m.rows()*m.cols(); ++i)
+        for (size_t i = 0; i < m.rows() * m.cols(); ++i)
         {
-                result(i) = scalar - m(i); // Aqui a ordem dita a matemática correta
-            
+            result(i) = scalar - m(i); // Aqui a ordem dita a matemática correta
         }
         return result;
     }
@@ -1377,13 +1423,15 @@ public:
 
         return true;
     }
-    [[nodiscard]] Matrix<T> operator-() const { 
+    [[nodiscard]] Matrix<T> operator-() const
+    {
         Matrix<T> result(rows_, cols_);
-        for (size_t i = 0; i < data_.size(); i++) {
+        for (size_t i = 0; i < data_.size(); i++)
+        {
             result.data_[i] = -data_[i];
         }
         return result;
-     }
+    }
 
     [[nodiscard]] Matrix<T> ew_prod(const Matrix<T> &other) const
     {
@@ -1542,7 +1590,10 @@ public:
         std::cout << _yellow << "\n[Auxiliary Global Functions]\n"
                   << _reset
                   << "  diag(M)             : Returns a square matrix with the diagonal elements of M\n"
-                  << "  |_        (or takes the elements of M into a diagonal, if M is a row or column vector).\n";
+                  << "  |_        (or takes the elements of M into a diagonal, if M is a row or column vector).\n"
+                  << "  strcc [object]      : Streaming for concatenating like std::cout.\n"
+                  << "  |   strcc << \"text \" << 23 << \" other text\";\n"
+                  << "  |_  strcc.str();    //gets the string \"text 23 other text\"\n";
         std::cin.get();
 
         std::cout << _yellow << "\n[Global Settings]\n"
@@ -2032,7 +2083,7 @@ public:
         return result;
     }
 
-    Matrix<T>& operator+=(const Matrix<T> &other)
+    Matrix<T> &operator+=(const Matrix<T> &other)
     {
         if (other.is_scalar())
         {
@@ -2059,7 +2110,7 @@ public:
         return *this;
     }
 
-    Matrix<T>& operator-=(const Matrix<T> &other)
+    Matrix<T> &operator-=(const Matrix<T> &other)
     {
         if (other.is_scalar())
         {
@@ -2087,7 +2138,7 @@ public:
         return *this;
     }
 
-    Matrix<T>& operator*=(const Matrix<T> &other)
+    Matrix<T> &operator*=(const Matrix<T> &other)
     {
         if (other.is_scalar())
         {
@@ -2115,7 +2166,7 @@ public:
         return *this;
     }
 
-    Matrix<T>& operator/=(const Matrix<T> &other)
+    Matrix<T> &operator/=(const Matrix<T> &other)
     {
         if (other.is_scalar())
         {
@@ -2142,37 +2193,34 @@ public:
         return *this;
     }
 
-    Matrix<T>& operator+=(T scalar) noexcept
+    Matrix<T> &operator+=(T scalar) noexcept
     {
-        for (size_t i = 0; i < rows(); i++)
+        for (size_t i = 0; i < rows() * cols(); i++)
         {
-            for (size_t j = 0; j < cols(); j++)
-                this->operator()(i, j) += scalar;
+            this->data_[i] += scalar;
         }
         return *this;
     }
 
-    Matrix<T>& operator-=(T scalar) noexcept
+    Matrix<T> &operator-=(T scalar) noexcept
     {
-        for (size_t i = 0; i < rows(); i++)
+        for (size_t i = 0; i < rows() * cols(); i++)
         {
-            for (size_t j = 0; j < cols(); j++)
-                this->operator()(i, j) -= scalar;
+            this->data_[i] -= scalar;
         }
         return *this;
     }
 
-    Matrix<T>& operator*=(T scalar) noexcept
+    Matrix<T> &operator*=(T scalar) noexcept
     {
-        for (size_t i = 0; i < rows(); i++)
+        for (size_t i = 0; i < rows() * cols(); i++)
         {
-            for (size_t j = 0; j < cols(); j++)
-                this->operator()(i, j) *= scalar;
+            this->data_[i] *= scalar;
         }
         return *this;
     }
 
-    Matrix<T>& operator/=(T scalar) noexcept
+    Matrix<T> &operator/=(T scalar) noexcept
     {
         if constexpr (std::is_integral_v<T>)
         {
@@ -2180,55 +2228,109 @@ public:
         }
         else
         {
-            for (size_t i = 0; i < rows(); i++)
+            for (size_t i = 0; i < rows() * cols(); i++)
             {
-                for (size_t j = 0; j < cols(); j++)
-                    this->operator()(i, j) /= scalar;
+                this->data_[i] /= scalar;
             }
         }
         return *this;
     }
 
-    Matrix<T> round()const {
+    Matrix<T> round() const
+    {
         if constexpr (std::is_integral_v<T>)
         {
-            throw std::exception(_red+"Matrix::round() Integral types are not allowed to invoke .round() method."+_reset);
+            throw std::exception(_red + "Matrix::round() Integral types are not allowed to invoke .round() method." + _reset);
         }
         Matrix<T> result = *this;
-        for(size_t i=0; i<rows();i++){
-            for(size_t j=0; j<cols();j++){
-                result(i,j) = std::round(result(i,j));
+        for (size_t i = 0; i < rows(); i++)
+        {
+            for (size_t j = 0; j < cols(); j++)
+            {
+                result(i, j) = std::round(result(i, j));
             }
         }
         return result;
     }
 
-    Matrix<T> ceil()const {
+    Matrix<T> ceil() const
+    {
         if constexpr (std::is_integral_v<T>)
         {
-            throw std::exception(_red+"Matrix::ceil() Integral types are not allowed to invoke .ceil() method."+_reset);
+            throw std::exception(_red + "Matrix::ceil() Integral types are not allowed to invoke .ceil() method." + _reset);
         }
         Matrix<T> result = *this;
-        for(size_t i=0; i<rows();i++){
-            for(size_t j=0; j<cols();j++){
-                result(i,j) = std::ceil(result(i,j));
+        for (size_t i = 0; i < rows(); i++)
+        {
+            for (size_t j = 0; j < cols(); j++)
+            {
+                result(i, j) = std::ceil(result(i, j));
             }
         }
         return result;
     }
 
-    Matrix<T> floor()const {
+    Matrix<T> floor() const
+    {
         if constexpr (std::is_integral_v<T>)
         {
-            throw std::exception(_red+"Matrix::floor() Integral types are not allowed to invoke .floor() method."+_reset);
+            throw std::exception(_red + "Matrix::floor() Integral types are not allowed to invoke .floor() method." + _reset);
         }
         Matrix<T> result = *this;
-        for(size_t i=0; i<rows();i++){
-            for(size_t j=0; j<cols();j++){
-                result(i,j) = std::floor(result(i,j));
+        for (size_t i = 0; i < rows(); i++)
+        {
+            for (size_t j = 0; j < cols(); j++)
+            {
+                result(i, j) = std::floor(result(i, j));
             }
         }
         return result;
+    }
+
+    bool is_lower_triangular(bool strictly_lower = false) const noexcept
+    {
+        for (size_t i = 0; i < rows_; ++i)
+        {
+            for (size_t j = 0; j < cols_; ++j)
+            {
+                if (strictly_lower)
+                {
+                    // diagonal e acima devem ser zero
+                    if (j >= i && (*this)(i, j) != T())
+                        return false;
+                }
+                else
+                {
+                    // apenas acima da diagonal deve ser zero
+                    if (j > i && (*this)(i, j) != T())
+                        return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    bool is_upper_triangular(bool strictly_lower = false) const noexcept
+    {
+        for (size_t i = 0; i < rows_; ++i)
+        {
+            for (size_t j = 0; j < cols_; ++j)
+            {
+                if (strictly_lower)
+                {
+                    // diagonal e acima devem ser zero
+                    if (i >= j && (*this)(i, j) != T())
+                        return false;
+                }
+                else
+                {
+                    // apenas acima da diagonal deve ser zero
+                    if (i > j && (*this)(i, j) != T())
+                        return false;
+                }
+            }
+        }
+        return true;
     }
 };
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "Matrix.hpp"
 #include "MatrixShape.hpp"
+#include "MatrixGen.hpp"
 #include <tuple>
 #include <cmath>
 #include <algorithm>
@@ -536,75 +537,86 @@ public:
     return r;
   }
 
-  
-
-template <typename T>
-static T norm(const Matrix<T> &A, float kind = 2.0f) noexcept
-{
-    if (A.is_empty()) return T();
+  template <typename T>
+  static T norm(const Matrix<T> &A, float kind = 2.0f) noexcept
+  {
+    if (A.is_empty())
+      return T();
 
     // Norma do Máximo (-1): Maior valor absoluto entre todos os elementos
-    if (kind == -1.0f) {
-        T max_val = 0;
-        for (size_t i = 0; i < A.rows() * A.cols(); i++) {
-            max_val = std::max(max_val, std::abs(A(i)));
-        }
-        return max_val;
+    if (kind == -1.0f)
+    {
+      T max_val = 0;
+      for (size_t i = 0; i < A.rows() * A.cols(); i++)
+      {
+        max_val = std::max(max_val, std::abs(A(i)));
+      }
+      return max_val;
     }
-    
+
     // Norma Infinito (-2): Máxima soma absoluta das linhas [max row sum]
-    if (kind == -2.0f) {
-        T max_sum = 0;
-        for (size_t i = 0; i < A.rows(); i++) {
-            T current_sum = 0;
-            for (size_t j = 0; j < A.cols(); j++) {
-                current_sum += std::abs(A(i, j));
-            }
-            max_sum = std::max(max_sum, current_sum);
+    if (kind == -2.0f)
+    {
+      T max_sum = 0;
+      for (size_t i = 0; i < A.rows(); i++)
+      {
+        T current_sum = 0;
+        for (size_t j = 0; j < A.cols(); j++)
+        {
+          current_sum += std::abs(A(i, j));
         }
-        return max_sum;
+        max_sum = std::max(max_sum, current_sum);
+      }
+      return max_sum;
     }
 
     // Norma 1 Induzida (-3): Máxima soma absoluta das colunas [max column sum]
-    if (kind == -3.0f) {
-        T max_sum = 0;
-        for (size_t j = 0; j < A.cols(); j++) {
-            T current_sum = 0;
-            for (size_t i = 0; i < A.rows(); i++) {
-                current_sum += std::abs(A(i, j));
-            }
-            max_sum = std::max(max_sum, current_sum);
+    if (kind == -3.0f)
+    {
+      T max_sum = 0;
+      for (size_t j = 0; j < A.cols(); j++)
+      {
+        T current_sum = 0;
+        for (size_t i = 0; i < A.rows(); i++)
+        {
+          current_sum += std::abs(A(i, j));
         }
-        return max_sum;
+        max_sum = std::max(max_sum, current_sum);
+      }
+      return max_sum;
     }
 
     // Norma-p elemento a elemento (Default)
     // Se kind == 2.0, esta é a Norma de Frobenius ultrarrápida O(N)
     T sum_ = 0;
-    for (size_t i = 0; i < A.rows() * A.cols(); i++) {
-        sum_ += std::pow(std::abs(A(i)), kind);
+    for (size_t i = 0; i < A.rows() * A.cols(); i++)
+    {
+      sum_ += std::pow(std::abs(A(i)), kind);
     }
     return std::pow(sum_, 1.0f / kind);
-}
+  }
 
-template <typename T>
-static T norm(const Matrix<T> &A, const std::string& kind) 
-{
-if(kind=="max"){
-  return norm(A,-1.0f);
-}
-if(kind=="inf"){
-  return norm(A,-2.0f);
-}
-if(kind=="ind"||kind=="induced"){
-  return norm(A,-3.0f);
-}
-if(kind=="fro"){
-  return norm(A,2.0f);
-}
-throw std::invalid_argument(_red+"MatrixLinAlg::norm() Values allowed are positive numbers or\n'max', 'inf', 'ind'='induced' or 'fro' for Frobenius."
-+_reset);
-}
+  template <typename T>
+  static T norm(const Matrix<T> &A, const std::string &kind)
+  {
+    if (kind == "max")
+    {
+      return norm(A, -1.0f);
+    }
+    if (kind == "inf")
+    {
+      return norm(A, -2.0f);
+    }
+    if (kind == "ind" || kind == "induced")
+    {
+      return norm(A, -3.0f);
+    }
+    if (kind == "fro")
+    {
+      return norm(A, 2.0f);
+    }
+    throw std::invalid_argument(_red + "MatrixLinAlg::norm() Values allowed are positive numbers or\n'max', 'inf', 'ind'='induced' or 'fro' for Frobenius." + _reset);
+  }
 
   // ==========================================
   // DECOMPOSIÇÃO SVD E RANK VERDADEIRO
@@ -733,4 +745,637 @@ throw std::invalid_argument(_red+"MatrixLinAlg::norm() Values allowed are positi
     }
     return r;
   }
+
+  // ==========================================
+  // DECOMPOSIÇÃO DE CHOLESKY (Matrizes Simétricas Positivas Definidas)
+  // ==========================================
+
+  // 1. O Motor Cholesky (Retorna {Matriz L, Sucesso})
+  template <typename T>
+  static std::pair<Matrix<T>, bool> cholesky(const Matrix<T> &A)
+  {
+    if (!A.is_square())
+    {
+      throw std::invalid_argument(_red + "\nMatrixAlgLin::cholesky() Matrix must be square.\n" + _reset);
+    }
+
+    size_t n = A.rows();
+    Matrix<T> L(n, n); // Já inicializada com zeros
+    L.msg("[L,is_ok] = MatrixAlgLin::cholesky(A) - matrix \"L\" such that A = L * L.t()");
+
+    // Verifica simetria rapidamente (opcional, mas recomendado)
+    if (!A.is_symmetric())
+      return {L, false};
+
+    for (size_t i = 0; i < n; i++)
+    {
+      for (size_t j = 0; j <= i; j++)
+      {
+        T sum = 0.0;
+
+        // Produto escalar da linha i com a linha j de L
+        for (size_t k = 0; k < j; k++)
+        {
+          sum += L(i, k) * L(j, k);
+        }
+
+        if (i == j) // Elementos da diagonal principal
+        {
+          T diag_val = A(i, i) - sum;
+
+          // Se o valor for <= 0, a matriz NÃO é Positiva Definida!
+          if (diag_val <= 1e-14)
+          {
+            return {L, false};
+          }
+
+          L(i, i) = std::sqrt(diag_val);
+        }
+        else // Elementos abaixo da diagonal
+        {
+          L(i, j) = (A(i, j) - sum) / L(j, j);
+        }
+      }
+    }
+    // L.msg("[L,is_ok] = MatrixAlgLin::cholesky(A) - matrix \"L\" such that A = L * L.t()");
+    return {L, true};
+  }
+
+  // 2. Verificador Booleano Direto
+  template <typename T>
+  static bool is_positive_definite(const Matrix<T> &A)
+  {
+    auto [L, is_pd] = cholesky(A);
+    return is_pd;
+  }
+
+  // ==========================================
+  // APLICAÇÕES DE CHOLESKY
+  // ==========================================
+
+  // 1. Resolve o sistema H * dx = -g (O jeito certo de usar no NR)
+  // Exige: Matriz Triangular Inferior L e o vetor do lado direito b (ou -g)
+  template <typename T>
+  static Matrix<T> solve_cholesky(const Matrix<T> &L, const Matrix<T> &b)
+  {
+    size_t n = L.rows();
+
+    // Passo 1: Resolve L * y = b (Retro-substituição frontal)
+    Matrix<T> y(n, 1);
+    for (size_t i = 0; i < n; i++)
+    {
+      y(i, 0) = b(i, 0);
+      for (size_t j = 0; j < i; j++)
+      {
+        y(i, 0) -= L(i, j) * y(j, 0);
+      }
+      y(i, 0) /= L(i, i);
+    }
+
+    // Passo 2: Resolve L^T * x = y (Retro-substituição traseira)
+    Matrix<T> x(n, 1);
+    for (int i = n - 1; i >= 0; i--)
+    {
+      x(i, 0) = y(i, 0);
+      for (int j = i + 1; j < (int)n; j++)
+      {
+        x(i, 0) -= L(j, i) * x(j, 0); // Note o L(j, i) simulando a transposta!
+      }
+      x(i, 0) /= L(i, i);
+    }
+    x.msg("x = MatrixLinAlg::solve_cholesky(L,b) Solve L * L.t() * x = b, for low triangular L");
+    return x;
+  }
+
+  // 2. Inverte a matriz original SPD explicitamente: H^{-1} = (L * L^T)^{-1}
+  template <typename T>
+  static Matrix<T> invert_cholesky(const Matrix<T> &L)
+  {
+    size_t n = L.rows();
+    Matrix<T> Inv(n, n);
+
+    // Primeiro, invertemos a matriz L (vamos chamar de L_inv)
+    Matrix<T> L_inv(n, n);
+    for (size_t j = 0; j < n; j++)
+    {
+      L_inv(j, j) = 1.0 / L(j, j);
+      for (size_t i = j + 1; i < n; i++)
+      {
+        T sum = 0.0;
+        for (size_t k = j; k < i; k++)
+        {
+          sum -= L(i, k) * L_inv(k, j);
+        }
+        L_inv(i, j) = sum / L(i, i);
+      }
+    }
+
+    // Agora, H^{-1} = L_inv^T * L_inv
+    // Otimização: Só precisamos calcular a parte triangular e espelhar, pois a inversa de SPD é SPD!
+    for (size_t i = 0; i < n; i++)
+    {
+      for (size_t j = i; j < n; j++)
+      {
+        T sum = 0.0;
+        for (size_t k = j; k < n; k++)
+        {
+          sum += L_inv(k, i) * L_inv(k, j);
+        }
+        Inv(i, j) = sum;
+        Inv(j, i) = sum; // Espelha para baixo da diagonal
+      }
+    }
+    Inv.msg("Ainv = MatrixLinAlg::invert_cholesky(L) Inverse of A such that A = L * L.t()");
+    return Inv;
+  }
+
+  // ==========================================
+  // FAST TRUNCATED SVD (Para PCA em Grande Escala)
+  // ==========================================
+  template <typename T>
+  static std::tuple<Matrix<T>, Matrix<T>, Matrix<T>> fast_svd(const Matrix<T> &A, T threshold = 0.95, size_t max_power_iters = 100)
+  {
+    size_t m = A.rows();
+    size_t n = A.cols();
+    size_t max_k = std::min(m, n);
+
+    // Matrizes temporárias para armazenar os componentes à medida que os encontramos
+    Matrix<T> U_temp(m, max_k);
+    Matrix<T> S_temp(max_k, max_k);
+    Matrix<T> V_temp(n, max_k);
+
+    Matrix<T> A_k = A; // Cópia de trabalho que será "esvaziada"
+
+    // 1. Calcula a Variância Total (Norma de Frobenius ao quadrado)
+    T total_variance = 0.0;
+    for (size_t i = 0; i < m; i++)
+    {
+      for (size_t j = 0; j < n; j++)
+      {
+        total_variance += A(i, j) * A(i, j);
+      }
+    }
+
+    if (total_variance == 0.0)
+      return {U_temp, S_temp, V_temp};
+
+    T accumulated_variance = 0.0;
+    size_t k = 0;
+
+    // 2. Extrai componentes até atingir o threshold de informação
+    for (; k < max_k; k++)
+    {
+      // Chute inicial para o vetor V (um vetor de uns normalizado)
+      Matrix<T> v(n, 1, T(1));
+      v /= norm(v, 2.0f);
+
+      Matrix<T> u(m, 1);
+      T sigma = 0.0;
+
+      // --- Power Iteration ---
+      for (size_t iter = 0; iter < max_power_iters; iter++)
+      {
+        // Multiplica pela matriz e normaliza (encontra vetor u)
+        u = A_k * v;
+        T u_norm = norm(u, 2.0f);
+        if (u_norm < 1e-14)
+          break;
+        u /= u_norm;
+
+        // Multiplica pela transposta e normaliza (encontra vetor v)
+        Matrix<T> v_new = A_k.t() * u;
+        T v_new_norm = norm(v_new, 2.0f);
+        if (v_new_norm < 1e-14)
+          break;
+        v_new /= v_new_norm;
+
+        // Verifica se a direção do vetor estabilizou (produto escalar ~ 1)
+        T dot = (v.t() * v_new)(0, 0);
+        v = v_new;
+        if (std::abs(1.0 - dot) < 1e-6)
+        {
+          break;
+        }
+      }
+
+      // --- Extração Final do Componente ---
+      u = A_k * v;
+      sigma = norm(u, 2.0f);
+      if (sigma < 1e-14)
+        break; // Não há mais informação útil
+      u /= sigma;
+
+      // Armazena nas matrizes temporárias
+      for (size_t i = 0; i < m; i++)
+        U_temp(i, k) = u(i, 0);
+      for (size_t i = 0; i < n; i++)
+        V_temp(i, k) = v(i, 0);
+      S_temp(k, k) = sigma;
+
+      // --- Deflation ---
+      // Removemos a informação (matriz de posto 1) que acabamos de extrair
+      A_k = A_k - (u * (v.t() * sigma));
+
+      // Atualiza a variância acumulada (sigma^2)
+      accumulated_variance += sigma * sigma;
+
+      // Verifica se já extraímos informação suficiente
+      if (accumulated_variance / total_variance >= threshold)
+      {
+        k++; // Contabiliza o componente atual e encerra a extração
+        break;
+      }
+    }
+
+    // 3. Monta e retorna as matrizes finais cortadas com o tamanho exato (k)
+    Matrix<T> U_trunc(m, k);
+    Matrix<T> S_trunc(k, k);
+    Matrix<T> V_trunc(n, k);
+
+    for (size_t j = 0; j < k; j++)
+    {
+      S_trunc(j, j) = S_temp(j, j);
+      for (size_t i = 0; i < m; i++)
+        U_trunc(i, j) = U_temp(i, j);
+      for (size_t i = 0; i < n; i++)
+        V_trunc(i, j) = V_temp(i, j);
+    }
+
+    U_trunc.msg("[U,S,V] = MatrixLinAlg::fast_svd(A,treshold) - matrix \"U\", [A ~ U * S * V.t()] treshold=" + std::to_string(threshold));
+    S_trunc.msg("[U,S,V] = MatrixLinAlg::fast_svd(A,treshold) - matrix \"S\", [A ~ U * S * V.t()] treshold=" + std::to_string(threshold));
+    V_trunc.msg("[U,S,V] = MatrixLinAlg::fast_svd(A,treshold) - matrix \"V\", [A ~ U * S * V.t()] treshold=" + std::to_string(threshold));
+    return {U_trunc, S_trunc, V_trunc};
+  }
+
+  // ==========================================
+  // DECOMPOSIÇÃO ESPECTRAL (Autovalores e Autovetores)
+  // ==========================================
+
+  // Decomposição Espectral via Método de Jacobi (Apenas para Matrizes Simétricas)
+  // Retorna a tupla {V, D} onde A = V * D * V.t()
+  // V = Matriz cujas colunas são os Autovetores Ortogonais
+  // D = Matriz Diagonal com os Autovalores
+  template <typename T>
+  static std::tuple<Matrix<T>, Matrix<T>> eigen_sym(const Matrix<T> &A, size_t max_sweeps = 50, T tol = 1e-10)
+  {
+    if (!A.is_square())
+    {
+      throw std::invalid_argument("\nMatrixAlgLin::eigen_sym() Matrix must be square.\n");
+    }
+
+    size_t n = A.rows();
+    Matrix<T> D = A;         // D começará como A e terminará estritamente diagonal
+    Matrix<T> V(n, n, T(0)); // V armazenará os autovetores (inicializada com zeros)
+
+    // Verifica a simetria rapidamente
+    for (size_t i = 0; i < n; i++)
+    {
+      V(i, i) = 1.0; // V começa como matriz Identidade
+      for (size_t j = i + 1; j < n; j++)
+      {
+        if (std::abs(A(i, j) - A(j, i)) > 1e-9)
+        {
+          std::cout << _yellow << "\nWarning: Matrix is not strictly symmetric. "
+                    << "Jacobi method may not converge properly.\n"
+                    << _reset;
+        }
+      }
+    }
+
+    for (size_t sweep = 0; sweep < max_sweeps; sweep++)
+    {
+      bool converged = true;
+
+      // Varredura Cíclica: Passa por todos os elementos acima da diagonal principal
+      for (size_t p = 0; p < n - 1; p++)
+      {
+        for (size_t q = p + 1; q < n; q++)
+        {
+          // Se o elemento fora da diagonal for maior que a tolerância, precisamos rotacionar!
+          if (std::abs(D(p, q)) > tol)
+          {
+            converged = false;
+
+            // Cálculo do ângulo da Rotação de Jacobi
+            T theta = (D(q, q) - D(p, p)) / (2.0 * D(p, q));
+            T t = (theta >= 0.0 ? 1.0 : -1.0) / (std::abs(theta) + std::sqrt(1.0 + theta * theta));
+            T c = 1.0 / std::sqrt(1.0 + t * t);
+            T s = t * c;
+
+            // Aplica a Rotação na matriz D (esmagando o elemento D(p,q) a zero)
+            T d_pp = D(p, p);
+            T d_qq = D(q, q);
+            T d_pq = D(p, q);
+
+            D(p, p) = c * c * d_pp - 2.0 * s * c * d_pq + s * s * d_qq;
+            D(q, q) = s * s * d_pp + 2.0 * s * c * d_pq + c * c * d_qq;
+            D(p, q) = 0.0;
+            D(q, p) = 0.0;
+
+            // Atualiza as outras entradas das linhas/colunas p e q
+            for (size_t i = 0; i < n; i++)
+            {
+              if (i != p && i != q)
+              {
+                T d_ip = D(i, p);
+                T d_iq = D(i, q);
+                D(i, p) = c * d_ip - s * d_iq;
+                D(p, i) = D(i, p); // Mantém a simetria
+                D(i, q) = s * d_ip + c * d_iq;
+                D(q, i) = D(i, q); // Mantém a simetria
+              }
+
+              // Acumula a rotação na matriz de Autovetores (V)
+              T v_ip = V(i, p);
+              T v_iq = V(i, q);
+              V(i, p) = c * v_ip - s * v_iq;
+              V(i, q) = s * v_ip + c * v_iq;
+            }
+          }
+        }
+      }
+      if (converged)
+        break; // A matriz já é puramente diagonal!
+    }
+    V.msg("[V,D] = MatrixLinAlg::eigen_sym(A) - matrix \"V\", such that A = V * D * V.t()");
+    D.msg("[V,D] = MatrixLinAlg::eigen_sym(A) - matrix \"D\", such that A = V * D * V.t()");
+
+    return {V, D};
+  }
+
+  template <typename T>
+  static T cos_angle(const Matrix<T> &u, const Matrix<T> &v)
+  {
+    if (!u.is_vector() || !v.is_vector())
+    {
+      throw std::invalid_argument(_red + "MatrixLinAlg::cos_angle(u,v) Matrices u and v must be vectors." +
+                                  _reset);
+    }
+    if (u.numel() != v.numel())
+    {
+      throw std::invalid_argument(_red + "MatrixLinAlg::cos_angle(u,v) Matrices u and v must have the same number of entries." +
+                                  "Got u(" + u.size() + ") vs v(" + v.size() + ")." + _reset);
+    }
+    return (u.flatten() * v.flatten().t())(0) / (norm(u) * norm(v));
+  }
+
+  template <typename T>
+  static T angle_between_rad(const Matrix<T> u, const Matrix<T> v)
+  {
+    return std::acos(cos_angle(u, v));
+  }
+
+  template <typename T>
+  static T angle_between_deg(const Matrix<T> u, const Matrix<T> v)
+  {
+    return 180 * std::acos(cos_angle(u, v)) / PI;
+  }
+
+  // ==========================================
+  // GEOMETRIA ANALÍTICA 3D
+  // ==========================================
+
+  template <typename T>
+  static Matrix<T> cross_product(const Matrix<T> &u, const Matrix<T> &v)
+  {
+    // [Garantia de Dimensões] O Produto Vetorial é estrito para o R^3
+    if (!u.is_vector() || !v.is_vector() || u.numel() != 3 || v.numel() != 3)
+    {
+      throw std::invalid_argument("\nMatrixAlgLin::cross_product() Both inputs must be 3D vectors.\n");
+    }
+
+    // Uniformiza os vetores para garantir que acessamos os índices corretamente
+    Matrix<T> uf = u.flatten();
+    Matrix<T> vf = v.flatten();
+
+    Matrix<T> result(3, 1); // Retorna sempre um vetor coluna padronizado
+
+    // Regra da Mão Direita:
+    // cx = uy*vz - uz*vy
+    result(0) = uf(1) * vf(2) - uf(2) * vf(1);
+    // cy = uz*vx - ux*vz
+    result(1) = uf(2) * vf(0) - uf(0) * vf(2);
+    // cz = ux*vy - uy*vx
+    result(2) = uf(0) * vf(1) - uf(1) * vf(0);
+
+    result.msg("MatrixLinAlg::cross_product() resulting vector");
+    return result;
+  }
+
+  // ==========================================
+  // EXTENSÃO ORTOGONAL (Householder)
+  // ==========================================
+  template <typename T>
+  static Matrix<T> complete_basis_from_vector(const Matrix<T> &u)
+  {
+    if (u.is_empty())
+    {
+      throw std::invalid_argument("\nMatrixAlgLin::complete_basis_from_vector() Requires a single vector.\n");
+    }
+
+    if (!u.is_vector())
+    {
+      throw std::invalid_argument("\nMatrixAlgLin::complete_basis_from_vector() Requires a single vector.\n");
+    }
+
+    size_t n = u.numel();
+    Matrix<T> Id = MatrixGen::eye<T>(n, n);
+
+    Matrix<T> x = u.flatten().t() / norm(u); // Força a ser vetor coluna
+
+    T norm_x = norm(x, 2.0f);
+    if (norm_x < 1e-14)
+    {
+      return Id; // Vetor nulo retorna identidade
+    }
+
+    // 1. Cria o vetor de reflexão v = x + sign(x0) * ||x|| * e1
+    Matrix<T> v = x;
+    // Escolhe o sinal para evitar cancelamento catastrófico
+    T sign = (x(0, 0) >= 0) ? 1.0 : -1.0;
+    v(0, 0) += sign * norm_x;
+
+    // 2. Calcula H = I - 2 * (v * v^T) / (v^T * v)
+    T v_norm_sq = (v.t() * v)(0, 0);
+    if (v_norm_sq < 1e-14)
+      return Id;
+
+    Matrix<T> H = Id - T(2) * (v * v.t()) / v_norm_sq;
+
+    // Ajuste de sinal para garantir que a 1ª coluna aponte no mesmo sentido de u
+    H *= (-sign);
+    H.msg("MatrixAlgLin::complete_basis_from_vector() Orthogonal basis");
+    return H;
+  }
+
+  // ==========================================
+  // BASE ORTONORMAL (Padrão MATLAB/SciPy)
+  // ==========================================
+  template <typename T>
+  static Matrix<T> orth(const Matrix<T> &A, T tol = 1e-9)
+  {
+    // 1. Roda o SVD
+    auto [U, S, V] = svd(A);
+
+    // 2. Descobre o rank (quantos vetores são linearmente independentes)
+    size_t r = 0;
+    for (size_t i = 0; i < S.rows(); i++)
+    {
+      if (S(i, i) > tol)
+        r++;
+    }
+
+    // Se a matriz for nula, retorna um vetor de zeros
+    if (r == 0)
+      return Matrix<T>(A.rows(), 1, T(0));
+
+    // 3. Extrai APENAS as colunas ortogonais válidas
+    Matrix<T> basis(A.rows(), r);
+    size_t col_idx = 0; // Controla em qual coluna da 'basis' estamos a escrever
+
+    for (size_t j = 0; j < S.rows(); j++)
+    {
+      // Só copia a coluna de U se o valor singular dela sobreviveu à tolerância!
+      if (S(j, j) > tol)
+      {
+        for (size_t i = 0; i < A.rows(); i++)
+        {
+          basis(i, col_idx) = U(i, j);
+        }
+        col_idx++;
+      }
+    }
+    basis.msg("MatrixLinAlg::orth() Orthogonal basis");
+    return basis;
+  }
+
+  // ==========================================
+  // FATORAÇÃO QR (Via Reflexões de Householder)
+  // ==========================================
+
+  // Retorna a tupla {Q, R} onde:
+  // Q é uma matriz Ortogonal (Q.t() * Q = Identidade)
+  // R é uma matriz Triangular Superior
+  template <typename T>
+  static std::tuple<Matrix<T>, Matrix<T>> qr(const Matrix<T> &A)
+  {
+    if (A.is_empty())
+    {
+      throw std::invalid_argument("\nMatrixLinAlg::qr() Matrix cannot be empty.\n");
+    }
+
+    size_t m = A.rows();
+    size_t n = A.cols();
+
+    Matrix<T> R = A;
+    Matrix<T> Q = MatrixGen::eye<T>(m, m); // Reciclando o seu utilitário brilhante!
+
+    // O limite é o mínimo entre m e n para tratar matrizes retangulares corretamente
+    size_t loops = std::min(m, n);
+
+    for (size_t k = 0; k < loops; k++)
+    {
+      // 1. Extrai o vetor 'x' da coluna 'k', apenas da diagonal para baixo
+      size_t sub_len = m - k;
+      Matrix<T> x(sub_len, 1);
+      for (size_t i = k; i < m; i++)
+      {
+        x(i - k, 0) = R(i, k);
+      }
+
+      T norm_x = norm(x, 2.0f);
+      if (norm_x < 1e-14)
+        continue; // Se a sub-coluna já for zero, pula a iteração
+
+      // 2. Constrói o vetor de Householder 'v'
+      Matrix<T> v = x;
+      T sign = (x(0, 0) >= 0) ? 1.0 : -1.0;
+      v(0, 0) += sign * norm_x;
+
+      T norm_v_sq = (v.t() * v)(0, 0);
+      if (norm_v_sq < 1e-14)
+        continue;
+
+      // 3. Atualiza a matriz R (aplica a reflexão apenas no bloco inferior direito)
+      // Fórmula: R_sub = R_sub - 2 * v * (v^T * R_sub) / (v^T * v)
+      for (size_t j = k; j < n; j++)
+      {
+        T dot = 0.0;
+        for (size_t i = k; i < m; i++)
+        {
+          dot += v(i - k, 0) * R(i, j); // Produto escalar parcial
+        }
+        dot *= (2.0 / norm_v_sq);
+        for (size_t i = k; i < m; i++)
+        {
+          R(i, j) -= v(i - k, 0) * dot; // Atualiza R in-place
+        }
+      }
+
+      // Garante zeros cravados abaixo da diagonal por causa de erros de ponto flutuante
+      for (size_t i = k + 1; i < m; i++)
+      {
+        R(i, k) = 0.0;
+      }
+
+      // 4. Atualiza a matriz Q (Acumula as reflexões: Q = Q * H_k)
+      for (size_t i = 0; i < m; i++)
+      {
+        T dot = 0.0;
+        for (size_t j = k; j < m; j++)
+        {
+          dot += Q(i, j) * v(j - k, 0);
+        }
+        dot *= (2.0 / norm_v_sq);
+        for (size_t j = k; j < m; j++)
+        {
+          Q(i, j) -= dot * v(j - k, 0); // Atualiza Q in-place
+        }
+      }
+    }
+    Q.msg("[Q,R] = MatrixLinAlg::qr(A) - matrix \"Q\" orthogonal in which A = Q * R");
+    R.msg("[Q,R] = MatrixLinAlg::qr(A) - matrix \"R\" upper triangular in which A = Q * R");
+    return {Q, R};
+  }
+
+
+
+
+  // ==========================================
+    // BASE PARA O NULLSPACE (Núcleo)
+    // ==========================================
+    template <typename T>
+    static Matrix<T> nullspace(const Matrix<T>& A, T tol = 1e-9) 
+    {
+        // 1. Roda o SVD
+        auto [U, S, V] = svd(A);
+        
+        // 2. Descobre a dimensão do Nullspace (Nulidade)
+        // A nulidade é a quantidade de valores singulares que "morreram" (são quase zero)
+        size_t nullity = 0;
+        for(size_t i = 0; i < S.rows(); i++) {
+            if (S(i, i) <= tol) nullity++;
+        }
+
+        // Se a nulidade for zero (matriz de posto completo), o único vetor no núcleo é o vetor nulo.
+        // Retornamos uma matriz vazia para indicar que a base é vazia.
+        if (nullity == 0) {
+            return Matrix<T>(); // Construtor padrão gerando matriz vazia
+        }
+
+        // 3. Extrai APENAS as colunas de V correspondentes aos valores singulares nulos
+        Matrix<T> basis(V.rows(), nullity);
+        size_t col_idx = 0;
+        
+        for(size_t j = 0; j < S.rows(); j++) {
+            if (S(j, j) <= tol) {
+                for(size_t i = 0; i < V.rows(); i++) {
+                    basis(i, col_idx) = V(i, j); // Extrai da matriz V (não U!)
+                }
+                col_idx++;
+            }
+        }
+        basis.msg("MatrixLinAlg::nullspace(A) - matrix \"N\" such that A * N = 0");
+        return basis;
+    }
 };

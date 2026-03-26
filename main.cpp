@@ -3,42 +3,64 @@
 #include "MatrixShape.hpp"
 #include "MatrixGen.hpp"
 #include "MatrixLinAlg.hpp"
+//#include <cmath>
 
 int main()
-{try{
+{
+    try
+    {
 
-    using alg = MatrixLinAlg;
-    using shape = MatrixShape;
-    using gen = MatrixGen;
-    using mx = Matrix<double>;
-    using mxi = Matrix<int>;
-    //mx::set_print_precision(2);
-    //mx::set_print_width(2);
- 
+        using alg = MatrixLinAlg;
+        using shape = MatrixShape;
+        using gen = MatrixGen;
+        using mx = Matrix<float>;
+        using mxi = Matrix<int>;
+        mx::set_print_precision(4);
+        mx::set_print_width(4);
 
- mx A = {{1,2,3},{4,5,6},{7,8,3},{10,11,11},{90,180,-200}};
- A.print();
- auto [U,S,V] = alg::svd(A);
- U.print();
- S.print();
- V.print();
- auto res = A - U * S * V.t();
- 
- res.msg("matriz residual").print();
- std::cout << "residuo norma " << alg::norm(res) << "\n";
-std::cout << "rank " << alg::rank(A) << "\n";
- 
+        
+
+// Matriz genérica retangular (4x3) para provarmos que funciona em qualquer dimensão!
+mx A = {{12, -51, 4},
+        { 6, 167, -68},
+        {-4,  24, -41},
+        {-1,   1,   0}};
+
+A.msg("matrix A").print();
+
+auto [Q, R] = alg::qr(A);
+
+Q.print();
+R.print();
+
+// Prova 1: Reconstrução
+mx A_rec = Q * R;
+A_rec.msg("Reconstrucao (Q * R) -> Deve ser igual a A").print();
+
+auto res = A - A_rec; strcc<< "residuo, norma = " << alg::norm(res);
+strcc(res).print();
+
+// Prova 2: Ortogonalidade
+mx I_prova = Q.t() * Q;
+I_prova.msg("Prova de Ortogonalidade (Q^T * Q) -> Deve ser a Identidade").print();
+        
 
 
 
 
 
-    
 
 
 
 
 
 
-}catch(const std::exception &e){std::cout << e.what() << "\n";}return j5r(100);
+
+
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << e.what() << "\n";
+    }
+    return j5r(100);
 }
