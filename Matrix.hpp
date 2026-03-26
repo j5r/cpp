@@ -21,21 +21,38 @@
 template <typename T>
 class Matrix;
 
-class ostringstream_extension : public std::ostringstream
+class ostringstream_extension
 {
 public:
-    using std::ostringstream::ostringstream; // herda construtores
+    std::ostringstream oss;
 
-    std::string operator()() const
+    std::string operator()()
     {
-        return this->str();
+        std::string value = oss.str();
+        oss.str(std::string());
+        oss.clear();
+        return value;
     }
-    std::string get() const { return (*this)(); }
+
+    ostringstream_extension &operator<<(const std::string &txt)
+    {
+        oss << txt;
+        return *this;
+    }
+
+    template <typename T>
+    ostringstream_extension &operator<<(const T value)
+    {
+        oss << value;
+        return *this;
+    }
+
+    std::string get() { return (*this)(); }
 
     template <typename T>
     Matrix<T> &operator()(Matrix<T> &m)
     {
-        m.msg(get());
+        m.msg((*this)());
         return m;
     }
 };
@@ -169,8 +186,8 @@ public:
     bool is_scalar() const noexcept { return rows_ == 1 && cols_ == 1; }
     bool is_rowvector() const noexcept { return rows_ == 1 && cols_ > 1; }
     bool is_colvector() const noexcept { return cols_ == 1 && rows_ > 1; }
-    bool is_vector() const noexcept { return is_colvector() || is_rowvector();}
-    size_t numel() const noexcept { return rows_*cols_;}
+    bool is_vector() const noexcept { return is_colvector() || is_rowvector(); }
+    size_t numel() const noexcept { return rows_ * cols_; }
     bool is_symmetric() const noexcept
     {
         if (!is_square())
@@ -701,7 +718,7 @@ public:
         }
 
         Matrix<T> result = *this;
-        result.msg("cumsum()");
+        result >> "cumsum()";
 
         if (axis == 0)
         {
@@ -1103,10 +1120,9 @@ public:
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
 
-        for (size_t i = 0; i < rows_*cols_; ++i)
+        for (size_t i = 0; i < rows_ * cols_; ++i)
         {
-                result(i) = (*this)(i) * scalar;
-            
+            result(i) = (*this)(i)*scalar;
         }
 
         return result;
@@ -1544,6 +1560,8 @@ public:
                   << _reset
                   << "  std::cout << M                : Prints the formatted matrix to the terminal.\n"
                   << "  !.msg(\"text\")                 : Sets a title to be displayed in the next .print() or std::cout.\n"
+                  << "  !M << text << number << text  : The same as .msg() but with << operator\n"
+                  << "  !M >> mytext (or number)      : The same as .msg() but clears previous title replacing by mytext\n"
                   << "  .print(appendix=\"\")           : Prints the matrix with an appendix string at the end.\n"
                   << "  .save_to_file(fname,sep=\";\")  : Saves the matrix in text format (CSV).\n"
                   << "  .load_from_file(fname,sep=\";\") : Loads the matrix from a text file (CSV).\n"
@@ -1979,8 +1997,9 @@ public:
                 result_val(0, j) = min_val;
             }
 
-            return {result_idx.msg("min idx | axis = " + std::to_string(axis)),
-                    result_val.msg("min val | axis = " + std::to_string(axis))};
+            result_idx >> "min idx | axis = " << (bool)axis;
+            result_val >> "min val | axis = " << (bool)axis;
+            return {result_idx, result_val};
         }
         else if (axis == 1) // Mínimo de cada LINHA (Resulta em Rowsx1)
         {
@@ -2001,8 +2020,9 @@ public:
                 result_val(i, 0) = *it_min;
             }
 
-            return {result_idx.msg("min idx | axis = " + std::to_string(axis)),
-                    result_val.msg("min val | axis = " + std::to_string(axis))};
+            result_idx >> "min idx | axis = " << (bool)axis;
+            result_val >> "min val | axis = " << (bool)axis;
+            return {result_idx, result_val};
         }
         else
         {
@@ -2035,8 +2055,9 @@ public:
                 result_val(0, j) = max_val;
             }
 
-            return {result_idx.msg("max idx | axis = " + std::to_string(axis)),
-                    result_val.msg("max val | axis = " + std::to_string(axis))};
+            result_idx >> "max idx | axis = " << (bool)axis;
+            result_val >> "max val | axis = " << (bool)axis;
+            return {result_idx, result_val};
         }
         else if (axis == 1) // Máximo de cada LINHA (Resulta em Rowsx1)
         {
@@ -2057,8 +2078,9 @@ public:
                 result_val(i, 0) = *it_max; // Desreferencia o iterador para obter o valor
             }
 
-            return {result_idx.msg("max idx | axis = " + std::to_string(axis)),
-                    result_val.msg("max val | axis = " + std::to_string(axis))};
+            result_idx >> "max idx | axis = " << (bool)axis;
+            result_val >> "max val | axis = " << (bool)axis;
+            return {result_idx, result_val};
         }
         else
         {
@@ -2331,6 +2353,36 @@ public:
             }
         }
         return true;
+    }
+
+    Matrix<T> &operator<<(const std::string &txt)
+    {
+        strcc << comment << txt;
+        strcc(*this);
+        return *this;
+    }
+
+    Matrix<T> &operator>>(const std::string &txt)
+    {
+        strcc << txt;
+        strcc(*this);
+        return *this;
+    }
+
+    template <typename U>
+    Matrix<T> &operator<<(U number)
+    {
+        strcc << comment << number;
+        strcc(*this);
+        return *this;
+    }
+
+    template <typename U>
+    Matrix<T> &operator>>(U number)
+    {
+        strcc << number;
+        strcc(*this);
+        return *this;
     }
 };
 

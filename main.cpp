@@ -5,6 +5,9 @@
 #include "MatrixLinAlg.hpp"
 //#include <cmath>
 
+
+
+
 int main()
 {
     try
@@ -13,36 +16,26 @@ int main()
         using alg = MatrixLinAlg;
         using shape = MatrixShape;
         using gen = MatrixGen;
-        using mx = Matrix<float>;
+        using mx = Matrix<double>;
         using mxi = Matrix<int>;
         mx::set_print_precision(4);
         mx::set_print_width(4);
 
         
 
-// Matriz genérica retangular (4x3) para provarmos que funciona em qualquer dimensão!
-mx A = {{12, -51, 4},
-        { 6, 167, -68},
-        {-4,  24, -41},
-        {-1,   1,   0}};
 
-A.msg("matrix A").print();
 
-auto [Q, R] = alg::qr(A);
+// Matriz Assimétrica (Autovalores conhecidos: 3, 2, 1)
+mx A = {{ 7,  2,  0},
+        {-1,  4,  9},
+        { -2,  2,  2}};
 
-Q.print();
-R.print();
+A.print();
 
-// Prova 1: Reconstrução
-mx A_rec = Q * R;
-A_rec.msg("Reconstrucao (Q * R) -> Deve ser igual a A").print();
 
-auto res = A - A_rec; strcc<< "residuo, norma = " << alg::norm(res);
-strcc(res).print();
 
-// Prova 2: Ortogonalidade
-mx I_prova = Q.t() * Q;
-I_prova.msg("Prova de Ortogonalidade (Q^T * Q) -> Deve ser a Identidade").print();
+mx autovalores = alg::eigvals_general(A);
+autovalores.print();
         
 
 

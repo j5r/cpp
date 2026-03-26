@@ -430,9 +430,9 @@ public:
         }
       }
     }
-    P.msg("[P,L,U,swaps] = MatrixLinAlg::factorize_LU(A) matrix \"P\", in which PA=LU");
-    L.msg("[P,L,U,swaps] = MatrixLinAlg::factorize_LU(A) matrix \"L\", in which PA=LU");
-    U.msg("[P,L,U,swaps] = MatrixLinAlg::factorize_LU(A) matrix \"U\", in which PA=LU");
+    P >> "[P,L,U,swaps] = MatrixLinAlg::factorize_LU(A) matrix \"P\", in which PA=LU";
+    L >> "[P,L,U,swaps] = MatrixLinAlg::factorize_LU(A) matrix \"L\", in which PA=LU";
+    U >> "[P,L,U,swaps] = MatrixLinAlg::factorize_LU(A) matrix \"U\", in which PA=LU";
     return {P, L, U, swaps};
   }
 
@@ -538,13 +538,13 @@ public:
   }
 
   template <typename T>
-  static T norm(const Matrix<T> &A, float kind = 2.0f) noexcept
+  static T norm(const Matrix<T> &A, T kind = 2.0) noexcept
   {
     if (A.is_empty())
       return T();
 
     // Norma do Máximo (-1): Maior valor absoluto entre todos os elementos
-    if (kind == -1.0f)
+    if (kind == -1.0)
     {
       T max_val = 0;
       for (size_t i = 0; i < A.rows() * A.cols(); i++)
@@ -555,7 +555,7 @@ public:
     }
 
     // Norma Infinito (-2): Máxima soma absoluta das linhas [max row sum]
-    if (kind == -2.0f)
+    if (kind == -2.0)
     {
       T max_sum = 0;
       for (size_t i = 0; i < A.rows(); i++)
@@ -571,7 +571,7 @@ public:
     }
 
     // Norma 1 Induzida (-3): Máxima soma absoluta das colunas [max column sum]
-    if (kind == -3.0f)
+    if (kind == -3.0)
     {
       T max_sum = 0;
       for (size_t j = 0; j < A.cols(); j++)
@@ -593,7 +593,7 @@ public:
     {
       sum_ += std::pow(std::abs(A(i)), kind);
     }
-    return std::pow(sum_, 1.0f / kind);
+    return std::pow(sum_, T(1.0) / kind);
   }
 
   template <typename T>
@@ -601,19 +601,19 @@ public:
   {
     if (kind == "max")
     {
-      return norm(A, -1.0f);
+      return norm(A, -1.0);
     }
     if (kind == "inf")
     {
-      return norm(A, -2.0f);
+      return norm(A, -2.0);
     }
     if (kind == "ind" || kind == "induced")
     {
-      return norm(A, -3.0f);
+      return norm(A, -3.0);
     }
     if (kind == "fro")
     {
-      return norm(A, 2.0f);
+      return norm(A, 2.0);
     }
     throw std::invalid_argument(_red + "MatrixLinAlg::norm() Values allowed are positive numbers or\n'max', 'inf', 'ind'='induced' or 'fro' for Frobenius." + _reset);
   }
@@ -722,9 +722,9 @@ public:
       }
     }
 
-    U.msg("[U,S,V] = MatrixLinAlg::svd(A) - matrix \"U\" in which A = U * S * V.t()");
-    S.msg("[U,S,V] = MatrixLinAlg::svd(A) - matrix \"S\" in which A = U * S * V.t()");
-    V.msg("[U,S,V] = MatrixLinAlg::svd(A) - matrix \"V\" in which A = U * S * V.t()");
+    U >> "[U,S,V] = MatrixLinAlg::svd(A) - matrix \"U\" in which A = U * S * V.t()";
+    S >> "[U,S,V] = MatrixLinAlg::svd(A) - matrix \"S\" in which A = U * S * V.t()";
+    V >> "[U,S,V] = MatrixLinAlg::svd(A) - matrix \"V\" in which A = U * S * V.t()";
     return {U, S, V};
   }
 
@@ -761,7 +761,7 @@ public:
 
     size_t n = A.rows();
     Matrix<T> L(n, n); // Já inicializada com zeros
-    L.msg("[L,is_ok] = MatrixAlgLin::cholesky(A) - matrix \"L\" such that A = L * L.t()");
+    L >> "[L,is_ok] = MatrixAlgLin::cholesky(A) - matrix \"L\" such that A = L * L.t()";
 
     // Verifica simetria rapidamente (opcional, mas recomendado)
     if (!A.is_symmetric())
@@ -797,7 +797,7 @@ public:
         }
       }
     }
-    // L.msg("[L,is_ok] = MatrixAlgLin::cholesky(A) - matrix \"L\" such that A = L * L.t()");
+    L >> "[L,is_ok] = MatrixAlgLin::cholesky(A) - matrix \"L\" such that A = L * L.t()";
     return {L, true};
   }
 
@@ -843,7 +843,7 @@ public:
       }
       x(i, 0) /= L(i, i);
     }
-    x.msg("x = MatrixLinAlg::solve_cholesky(L,b) Solve L * L.t() * x = b, for low triangular L");
+    x >> "x = MatrixLinAlg::solve_cholesky(L,b) Solve L * L.t() * x = b, for low triangular L";
     return x;
   }
 
@@ -885,7 +885,7 @@ public:
         Inv(j, i) = sum; // Espelha para baixo da diagonal
       }
     }
-    Inv.msg("Ainv = MatrixLinAlg::invert_cholesky(L) Inverse of A such that A = L * L.t()");
+    Inv >> "Ainv = MatrixLinAlg::invert_cholesky(L) Inverse of A such that A = L * L.t()";
     return Inv;
   }
 
@@ -927,7 +927,7 @@ public:
     {
       // Chute inicial para o vetor V (um vetor de uns normalizado)
       Matrix<T> v(n, 1, T(1));
-      v /= norm(v, 2.0f);
+      v /= norm(v, 2.0);
 
       Matrix<T> u(m, 1);
       T sigma = 0.0;
@@ -937,14 +937,14 @@ public:
       {
         // Multiplica pela matriz e normaliza (encontra vetor u)
         u = A_k * v;
-        T u_norm = norm(u, 2.0f);
+        T u_norm = norm(u, 2.0);
         if (u_norm < 1e-14)
           break;
         u /= u_norm;
 
         // Multiplica pela transposta e normaliza (encontra vetor v)
         Matrix<T> v_new = A_k.t() * u;
-        T v_new_norm = norm(v_new, 2.0f);
+        T v_new_norm = norm(v_new, 2.0);
         if (v_new_norm < 1e-14)
           break;
         v_new /= v_new_norm;
@@ -960,7 +960,7 @@ public:
 
       // --- Extração Final do Componente ---
       u = A_k * v;
-      sigma = norm(u, 2.0f);
+      sigma = norm(u, 2.0);
       if (sigma < 1e-14)
         break; // Não há mais informação útil
       u /= sigma;
@@ -1001,9 +1001,9 @@ public:
         V_trunc(i, j) = V_temp(i, j);
     }
 
-    U_trunc.msg("[U,S,V] = MatrixLinAlg::fast_svd(A,treshold) - matrix \"U\", [A ~ U * S * V.t()] treshold=" + std::to_string(threshold));
-    S_trunc.msg("[U,S,V] = MatrixLinAlg::fast_svd(A,treshold) - matrix \"S\", [A ~ U * S * V.t()] treshold=" + std::to_string(threshold));
-    V_trunc.msg("[U,S,V] = MatrixLinAlg::fast_svd(A,treshold) - matrix \"V\", [A ~ U * S * V.t()] treshold=" + std::to_string(threshold));
+    U_trunc >> "[U,S,V] = MatrixLinAlg::fast_svd(A,treshold) - matrix \"U\", [A ~ U * S * V.t()] treshold=" + std::to_string(threshold);
+    S_trunc >> "[U,S,V] = MatrixLinAlg::fast_svd(A,treshold) - matrix \"S\", [A ~ U * S * V.t()] treshold=" + std::to_string(threshold);
+    V_trunc >> "[U,S,V] = MatrixLinAlg::fast_svd(A,treshold) - matrix \"V\", [A ~ U * S * V.t()] treshold=" + std::to_string(threshold);
     return {U_trunc, S_trunc, V_trunc};
   }
 
@@ -1097,8 +1097,8 @@ public:
       if (converged)
         break; // A matriz já é puramente diagonal!
     }
-    V.msg("[V,D] = MatrixLinAlg::eigen_sym(A) - matrix \"V\", such that A = V * D * V.t()");
-    D.msg("[V,D] = MatrixLinAlg::eigen_sym(A) - matrix \"D\", such that A = V * D * V.t()");
+    V >> "[V,D] = MatrixLinAlg::eigen_sym(A) - matrix \"V\", such that A = V * D * V.t()";
+    D >> "[V,D] = MatrixLinAlg::eigen_sym(A) - matrix \"D\", such that A = V * D * V.t()";
 
     return {V, D};
   }
@@ -1158,7 +1158,7 @@ public:
     // cz = ux*vy - uy*vx
     result(2) = uf(0) * vf(1) - uf(1) * vf(0);
 
-    result.msg("MatrixLinAlg::cross_product() resulting vector");
+    result >> "MatrixLinAlg::cross_product() resulting vector";
     return result;
   }
 
@@ -1183,7 +1183,7 @@ public:
 
     Matrix<T> x = u.flatten().t() / norm(u); // Força a ser vetor coluna
 
-    T norm_x = norm(x, 2.0f);
+    T norm_x = norm(x, 2.0);
     if (norm_x < 1e-14)
     {
       return Id; // Vetor nulo retorna identidade
@@ -1204,7 +1204,7 @@ public:
 
     // Ajuste de sinal para garantir que a 1ª coluna aponte no mesmo sentido de u
     H *= (-sign);
-    H.msg("MatrixAlgLin::complete_basis_from_vector() Orthogonal basis");
+    H >> "MatrixAlgLin::complete_basis_from_vector() Orthogonal basis";
     return H;
   }
 
@@ -1245,7 +1245,7 @@ public:
         col_idx++;
       }
     }
-    basis.msg("MatrixLinAlg::orth() Orthogonal basis");
+    basis >> "MatrixLinAlg::orth() Orthogonal basis";
     return basis;
   }
 
@@ -1283,7 +1283,7 @@ public:
         x(i - k, 0) = R(i, k);
       }
 
-      T norm_x = norm(x, 2.0f);
+      T norm_x = norm(x, 2.0);
       if (norm_x < 1e-14)
         continue; // Se a sub-coluna já for zero, pula a iteração
 
@@ -1333,49 +1333,99 @@ public:
         }
       }
     }
-    Q.msg("[Q,R] = MatrixLinAlg::qr(A) - matrix \"Q\" orthogonal in which A = Q * R");
-    R.msg("[Q,R] = MatrixLinAlg::qr(A) - matrix \"R\" upper triangular in which A = Q * R");
+    Q >> "[Q,R] = MatrixLinAlg::qr(A) - matrix \"Q\" orthogonal in which A = Q * R";
+    R >> "[Q,R] = MatrixLinAlg::qr(A) - matrix \"R\" upper triangular in which A = Q * R";
     return {Q, R};
   }
 
+  // ==========================================
+  // BASE PARA O NULLSPACE (Núcleo)
+  // ==========================================
+  template <typename T>
+  static Matrix<T> nullspace(const Matrix<T> &A, T tol = 1e-9)
+  {
+    // 1. Roda o SVD
+    auto [U, S, V] = svd(A);
 
+    // 2. Descobre a dimensão do Nullspace (Nulidade)
+    // A nulidade é a quantidade de valores singulares que "morreram" (são quase zero)
+    size_t nullity = 0;
+    for (size_t i = 0; i < S.rows(); i++)
+    {
+      if (S(i, i) <= tol)
+        nullity++;
+    }
 
+    // Se a nulidade for zero (matriz de posto completo), o único vetor no núcleo é o vetor nulo.
+    // Retornamos uma matriz vazia para indicar que a base é vazia.
+    if (nullity == 0)
+    {
+      Matrix<T> result(0, 0); // Construtor padrão gerando matriz vazia
+      result >> "MatrixLinAlg::nullspace(A) - matrix A is full rank, so it has only the trivial zero";
+      return result;
+    }
+
+    // 3. Extrai APENAS as colunas de V correspondentes aos valores singulares nulos
+    Matrix<T> basis(V.rows(), nullity);
+    size_t col_idx = 0;
+
+    for (size_t j = 0; j < S.rows(); j++)
+    {
+      if (S(j, j) <= tol)
+      {
+        for (size_t i = 0; i < V.rows(); i++)
+        {
+          basis(i, col_idx) = V(i, j); // Extrai da matriz V (não U!)
+        }
+        col_idx++;
+      }
+    }
+    basis >> "MatrixLinAlg::nullspace(A) - matrix \"N\" such that A * N = 0";
+    return basis;
+  }
 
   // ==========================================
-    // BASE PARA O NULLSPACE (Núcleo)
-    // ==========================================
-    template <typename T>
-    static Matrix<T> nullspace(const Matrix<T>& A, T tol = 1e-9) 
+  // AUTOVALORES GERAIS (Algoritmo QR Básico)
+  // ==========================================
+
+  // Retorna um vetor coluna com os autovalores reais da matriz A
+  template <typename T>
+  static Matrix<T> eigvals_general(Matrix<T> A, size_t max_iters = 1000, T tol = 1e-9)
+  {
+    if (!A.is_square())
     {
-        // 1. Roda o SVD
-        auto [U, S, V] = svd(A);
-        
-        // 2. Descobre a dimensão do Nullspace (Nulidade)
-        // A nulidade é a quantidade de valores singulares que "morreram" (são quase zero)
-        size_t nullity = 0;
-        for(size_t i = 0; i < S.rows(); i++) {
-            if (S(i, i) <= tol) nullity++;
-        }
-
-        // Se a nulidade for zero (matriz de posto completo), o único vetor no núcleo é o vetor nulo.
-        // Retornamos uma matriz vazia para indicar que a base é vazia.
-        if (nullity == 0) {
-            return Matrix<T>(); // Construtor padrão gerando matriz vazia
-        }
-
-        // 3. Extrai APENAS as colunas de V correspondentes aos valores singulares nulos
-        Matrix<T> basis(V.rows(), nullity);
-        size_t col_idx = 0;
-        
-        for(size_t j = 0; j < S.rows(); j++) {
-            if (S(j, j) <= tol) {
-                for(size_t i = 0; i < V.rows(); i++) {
-                    basis(i, col_idx) = V(i, j); // Extrai da matriz V (não U!)
-                }
-                col_idx++;
-            }
-        }
-        basis.msg("MatrixLinAlg::nullspace(A) - matrix \"N\" such that A * N = 0");
-        return basis;
+      throw std::invalid_argument("\nMatrixAlgLin::eigvals_general() Matrix must be square.\n");
     }
+
+    size_t n = A.rows();
+
+    for (size_t iter = 0; iter < max_iters; iter++)
+    {
+      // 1. Fatora a matriz atual
+      auto [Q, R] = qr(A);
+
+      // 2. Multiplica na ordem inversa
+      A = R * Q;
+
+      // 3. Verifica a convergência
+      // O algoritmo converge quando a subdiagonal (elementos logo abaixo da diagonal principal) tende a zero
+      bool converged = true;
+      for (size_t i = 1; i < n; i++)
+      {
+        if (std::abs(A(i, i - 1)) > tol)
+        {
+          converged = false;
+          break;
+        }
+      }
+      if (converged)
+        break;
+    }
+
+    // Extrai a diagonal principal (os autovalores)
+    Matrix<T> eigenvalues = A.diag();
+    eigenvalues >> "MatrixLinAlg::eigvals_general(A) - REAL EIGVALS ONLY! BE CAREFUL";
+
+    return eigenvalues;
+  }
 };
