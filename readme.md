@@ -1,3 +1,34 @@
+Operadores que PODEM ser sobrecarregados
+A maioria dos operadores aritméticos, lógicos e de acesso pode ser redefinida: 
+
+Aritméticos: +, -, *, /, %, ++, --.
+Relacionais: ==, !=, <, >, <=, >=.
+Atribuição: =, +=, -=, *=, /=, etc.
+Lógicos e Bitwise: &&, ||, !, &, |, ^, <<, >>.
+
+
+Especiais:
+-> (Acesso a membro por ponteiro).
+[] (Subscrito/Array).
+() (Chamada de função/Functor).
+new, delete (Gerenciamento de memória).
+* (Desreferenciação unária).
+, (Vírgula). 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ```c++
 #include <type_traits>
 

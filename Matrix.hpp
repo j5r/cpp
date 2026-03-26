@@ -15,6 +15,7 @@
 #include <initializer_list>
 #include <utility>
 #include <iostream>
+#include <cstdint>
 #include <sstream>
 #define PI 3.14159265358979323846264338327950288419716939937510
 
@@ -57,6 +58,90 @@ public:
     }
 };
 
+#include <iostream>
+#include <cstdint>
+
+struct j5r_bool
+{
+    uint8_t value;
+
+    // Construtor padrão (inicia com 0)
+    j5r_bool() : value(0) {}
+
+    // Construtor Template: Aceita QUALQUER tipo numérico
+    template <typename U>
+    j5r_bool(U v) : value(v != static_cast<U>(0) ? 1 : 0) {}
+
+    // Operador de Atribuição Template: Blinda QUALQUER tipo numérico
+    template <typename U>
+    j5r_bool &operator=(U v)
+    {
+        value = (v != static_cast<U>(0) ? 1 : 0);
+        return *this;
+    }
+
+    // Conversões para quando a matriz precisar de ler o valor
+    operator uint8_t() const { return value; }
+    // O 'explicit' salva o dia! Evita que o C++ use o bool para contas matemáticas.
+    explicit operator bool() const { return value != 0; }
+};
+
+inline std::ostream &operator<<(std::ostream &os, const j5r_bool &b)
+{
+    // O cast para int é OBRIGATÓRIO para imprimir como número (0 ou 1),
+    // caso contrário o cout tentará imprimir como um caractere ASCII!
+    os << static_cast<int>(b.value);
+    return os;
+}
+
+inline j5r_bool operator-(const j5r_bool &b)
+{
+    return b;
+}
+
+// ==========================================
+// INJEÇÃO NA BIBLIOTECA PADRÃO (Traits)
+// ==========================================
+// Ensinamos o C++ a tratar o nosso tipo customizado dentro das funções matemáticas do std
+namespace std
+{
+    inline bool isnan(j5r_bool /*val*/)
+    {
+        return false; // Um bit nunca é NaN
+    }
+
+    inline bool isinf(j5r_bool /*val*/)
+    {
+        return false; // Um bit nunca é infinito
+    }
+
+    // 1. Quando misturar j5r_bool com j5r_bool, o resultado é j5r_bool
+    template <>
+    struct common_type<j5r_bool, j5r_bool>
+    {
+        using type = j5r_bool;
+    };
+
+    // 2. Quando misturar j5r_bool com outro tipo T (ex: int, double), trate o j5r_bool como se fosse um uint8_t
+    template <typename T>
+    struct common_type<j5r_bool, T>
+    {
+        using type = typename std::common_type<uint8_t, T>::type;
+    };
+
+    // 3. O inverso do caso 2 (ex: T misturado com j5r_bool)
+    template <typename T>
+    struct common_type<T, j5r_bool>
+    {
+        using type = typename std::common_type<T, uint8_t>::type;
+    };
+
+}
+
+// Agora o seu alias usa o tipo blindado e a classe Matrix fica intocada!
+// template <typename T> class Matrix { ... };
+// using Matrixbool = Matrix<j5r_bool>;
+
 inline ostringstream_extension strcc; // string concatenator like std::cout;
 // example
 //   strcc << "text " << 23 << " other text";
@@ -64,6 +149,7 @@ inline ostringstream_extension strcc; // string concatenator like std::cout;
 //   strcc.str();    //gets the string "text 23 other text"
 //   strcc.get();    //gets the string "text 23 other text"
 //   strcc();        //gets the string "text 23 other text"
+//   strcc(M);       //gets the string and sets in .msg() of matrix M
 
 inline int j5r(size_t seconds = 5)
 {
@@ -110,7 +196,7 @@ class Matrix
 
     static_assert(!std::is_same_v<T, bool>,
                   "\033[5;32m\n[MATRIX ERROR]: Matrix<bool> is <<strictly prohibited>>\033[1m due to std::vector<bool> performance overhead. "
-                  "\nPlease use the 'Matrixbool' alias instead! (Matrixbool is an alias for Matrix<uint8_t>)\033[m\n");
+                  "\nPlease use the 'Matrixbool' alias instead! (Matrixbool is an alias for Matrix<j5r_bool>)\033[m\n");
 
 private:
     size_t rows_;
@@ -125,11 +211,40 @@ private:
     inline static size_t print_style_ = 1;
 
 public:
+    enum class Axis
+    {
+        row = 0,
+        col = 1
+    };
     friend class MatrixLinAlg;
     // Construtores
     Matrix() : rows_(0), cols_(0) {}
     Matrix(size_t rows, size_t cols) : rows_(rows), cols_(cols), data_(rows * cols, T()) {}
     Matrix(size_t rows, size_t cols, T initial_value) : rows_(rows), cols_(cols), data_(rows * cols, initial_value) {}
+
+    // --- CONSTRUTOR PARA CONVERSAO 'CASTING'
+    // EXEMPLO: Matrix<double> B = A
+    template <typename U>
+    Matrix(const Matrix<U> &other)
+    {
+        Matrix<T> result(other.rows(), other.cols());
+        for (size_t i = 0; i < other.rows() * other.cols(); i++)
+            result(i) = static_cast<T>(other(i));
+        *this = result;
+    }
+    // --- CONVERSAO EXPLICITA DE CASTING
+    // EXEMPLO: Matrix<double> B = (double) A;
+    template <typename U>
+    operator Matrix<U>() const
+    {
+        Matrix<U> result(rows_, cols_);
+        for (int i = 0; i < rows_ * cols_; ++i)
+        {
+            // O static_cast garante a conversão segura entre tipos (ex: int -> double)
+            result.data_[i] = static_cast<U>(this->data_[i]);
+        }
+        return result;
+    }
 
     // --- CONSTRUTOR COM LISTA DE INICIALIZAÇÃO ---
 
@@ -175,6 +290,7 @@ public:
     static void set_print_color(size_t color_int) noexcept { Matrix<T>::print_color_ = (color_int % 6) + 1; }
     static void set_print_font(size_t style_int) noexcept { Matrix<T>::print_style_ = (style_int % 9) + 1; }
     static void set_print_debug(bool debug) noexcept { print_debug_ = debug; }
+    static void debug(bool d) { print_debug_ = d; };
     size_t rows() const noexcept { return rows_; }
     size_t cols() const noexcept { return cols_; }
     size_t ilrow() const noexcept { return rows_ - 1; }                                               // index of last row (ilrow)
@@ -660,9 +776,9 @@ public:
         return result;
     }
 
-    [[nodiscard]] Matrix<T> sum(uint8_t axis = 0) const
+    [[nodiscard]] Matrix<T> sum(Axis axis = Axis::row) const
     {
-        if (axis == 0)
+        if (axis == Axis::row)
         {
             // Soma ao longo das colunas, resultando em um vetor linha
             Matrix<T> result(1, cols_);
@@ -679,7 +795,7 @@ public:
 
             return result;
         }
-        else if (axis == 1)
+        else if (axis == Axis::col)
         {
             // Soma ao longo das linhas, resultando em um vetor coluna
             Matrix<T> result(rows_, 1);
@@ -705,11 +821,11 @@ public:
     [[nodiscard]] T sumsum() noexcept
     {
         Matrix<T> temp = sum();
-        temp = temp.sum(1);
+        temp = temp.sum(Axis::col);
         return temp(0, 0);
     }
 
-    [[nodiscard]] Matrix<T> cumsum(uint8_t axis = 0) const
+    [[nodiscard]] Matrix<T> cumsum(Axis axis = Axis::row) const
     {
         if (axis != 0 && axis != 1)
         {
@@ -748,11 +864,11 @@ public:
         }
     }
 
-    [[nodiscard]] Matrix<T> mean(uint8_t axis = 0) const noexcept
+    [[nodiscard]] Matrix<T> mean(Axis axis = Axis::row) const noexcept
     {
         Matrix<T> sum_result = this->sum(axis);
 
-        if (axis == 0)
+        if (axis == Axis::row)
         {
             // Divide cada elemento do vetor linha pela quantidade de linhas para obter a média
             for (size_t j = 0; j < sum_result.cols(); ++j)
@@ -760,7 +876,7 @@ public:
                 sum_result(0, j) /= static_cast<T>(this->rows());
             }
         }
-        else if (axis == 1)
+        else if (axis == Axis::col)
         {
             // Divide cada elemento do vetor coluna pela quantidade de colunas para obter a média
             for (size_t i = 0; i < sum_result.rows(); ++i)
@@ -772,12 +888,12 @@ public:
         return sum_result;
     }
 
-    [[nodiscard]] Matrix<T> var(uint8_t axis = 0) const noexcept
+    [[nodiscard]] Matrix<T> var(Axis axis = Axis::row) const noexcept
     {
         Matrix<T> mean_result = this->mean(axis);
         Matrix<T> var_result(mean_result.rows(), mean_result.cols());
 
-        if (axis == 0)
+        if (axis == Axis::row)
         {
             for (size_t j = 0; j < this->cols(); ++j)
             {
@@ -790,7 +906,7 @@ public:
                 var_result(0, j) = sum_squared_diff / static_cast<T>(this->rows());
             }
         }
-        else if (axis == 1)
+        else if (axis == Axis::col)
         {
             for (size_t i = 0; i < this->rows(); ++i)
             {
@@ -807,7 +923,7 @@ public:
         return var_result;
     }
 
-    [[nodiscard]] Matrix<T> std(uint8_t axis = 0) const noexcept
+    [[nodiscard]] Matrix<T> std(Axis axis = Axis::row) const noexcept
     {
         Matrix<T> var_result = this->var(axis);
         Matrix<T> std_result(var_result.rows(), var_result.cols());
@@ -1671,9 +1787,9 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator>(const U &scalar) const
+    Matrix<j5r_bool> operator>(const U &scalar) const
     {
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1685,9 +1801,9 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator>=(const U &scalar) const
+    Matrix<j5r_bool> operator>=(const U &scalar) const
     {
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1699,9 +1815,9 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator<(const U &scalar) const
+    Matrix<j5r_bool> operator<(const U &scalar) const
     {
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1713,9 +1829,9 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator<=(const U &scalar) const
+    Matrix<j5r_bool> operator<=(const U &scalar) const
     {
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1727,9 +1843,9 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator==(const U &scalar) const
+    Matrix<j5r_bool> operator==(const U &scalar) const
     {
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1741,9 +1857,9 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator!=(const U &scalar) const
+    Matrix<j5r_bool> operator!=(const U &scalar) const
     {
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1755,7 +1871,7 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator>(const Matrix<U> &other) const
+    Matrix<j5r_bool> operator>(const Matrix<U> &other) const
     {
         if (other.is_scalar())
         {
@@ -1766,7 +1882,7 @@ public:
             throw std::invalid_argument(_red +
                                         "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
         }
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1778,7 +1894,7 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator<(const Matrix<U> &other) const
+    Matrix<j5r_bool> operator<(const Matrix<U> &other) const
     {
         if (other.is_scalar())
         {
@@ -1789,7 +1905,7 @@ public:
             throw std::invalid_argument(_red +
                                         "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
         }
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1801,7 +1917,7 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator>=(const Matrix<U> &other) const
+    Matrix<j5r_bool> operator>=(const Matrix<U> &other) const
     {
         if (other.is_scalar())
         {
@@ -1812,7 +1928,7 @@ public:
             throw std::invalid_argument(_red +
                                         "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
         }
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1824,7 +1940,7 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator<=(const Matrix<U> &other) const
+    Matrix<j5r_bool> operator<=(const Matrix<U> &other) const
     {
         if (other.is_scalar())
         {
@@ -1835,7 +1951,7 @@ public:
             throw std::invalid_argument(_red +
                                         "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
         }
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1847,7 +1963,7 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator==(const Matrix<U> &other) const
+    Matrix<j5r_bool> operator==(const Matrix<U> &other) const
     {
         if (other.is_scalar())
         {
@@ -1858,7 +1974,7 @@ public:
             throw std::invalid_argument(_red +
                                         "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
         }
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -1870,7 +1986,7 @@ public:
     }
 
     template <typename U>
-    Matrix<uint8_t> operator!=(const Matrix<U> &other) const
+    Matrix<j5r_bool> operator!=(const Matrix<U> &other) const
     {
         if (other.is_scalar())
         {
@@ -1881,7 +1997,7 @@ public:
             throw std::invalid_argument(_red +
                                         "\nMatrix::operator>() Matrices must have the same size. Got " + size() + " vs " + other.size() + ".\n" + _reset);
         }
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         for (size_t i = 0; i < rows_; i++)
         {
             for (size_t j = 0; j < cols_; j++)
@@ -2355,6 +2471,67 @@ public:
         return true;
     }
 
+    Matrix<T> operator^(size_t exponent)
+    {
+        return pow(exponent);
+    }
+
+    Matrix<T> triu(bool strictly_above = false) const noexcept
+    {
+        if (is_vector() || is_scalar())
+        {
+            return Matrix<T>();
+        }
+        Matrix<T> result(rows_, cols_, T(0));
+        for (size_t i = 0; i < rows(); i++)
+        {
+            for (size_t j = 0; j < cols(); j++)
+            {
+                if (strictly_above)
+                {
+                    if (j <= i)
+                        continue;
+                }
+                else
+                {
+                    if (j < i)
+                        continue;
+                }
+                result(i, j) = (*this)(i, j);
+            }
+        }
+        result >> "Matrix::triu() - triangular upper. Strictly above diagonal? -> " << strictly_above;
+        return result;
+    }
+
+    Matrix<T> tril(bool strictly_above = false) const noexcept
+    {
+        if (is_vector() || is_scalar())
+        {
+            return Matrix<T>();
+        }
+        Matrix<T> result(rows_, cols_, T(0));
+        for (size_t i = 0; i < rows(); i++)
+        {
+            for (size_t j = 0; j < cols(); j++)
+            {
+                if (strictly_above)
+                {
+                    if (i <= j)
+                        continue;
+                }
+                else
+                {
+                    if (i < j)
+                        continue;
+                }
+                result(i, j) = (*this)(i, j);
+            }
+        }
+        result >> "Matrix::tril() - triangular lower. Strictly below diagonal? -> " << strictly_above;
+        return result;
+    }
+
     Matrix<T> &operator<<(const std::string &txt)
     {
         strcc << comment << txt;
@@ -2384,6 +2561,82 @@ public:
         strcc(*this);
         return *this;
     }
+
+    /* remova esses operadores abaixo */
+    void operator++(int)
+    { // objeto++
+        (*this) += T(1);
+    }
+    void operator--(int)
+    { // objeto++
+        (*this) -= T(1);
+    }
+    void operator++() // o que fazer com esse ?
+    {                 // ++objeto
+
+        print();
+    }
+
+    Matrix<uint8_t> operator||(const Matrix<T> &other) const
+    {
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "Matrix::operator||() Matrices must have the same dimensions." + _reset);
+        }
+        Matrix<uint8_t> result(rows_, cols_);
+        bool mine, yours;
+        for (size_t i = 0; i < rows_ * cols_; i++)
+        {
+            mine = static_cast<bool>((*this)(i));
+            yours = static_cast<bool>(other(i));
+            result(i) = (mine || yours) ? 1 : 0;
+        }
+        return result;
+    }
+
+    Matrix<uint8_t> operator&&(const Matrix<T> &other) const
+    {
+        if (rows_ != other.rows() || cols_ != other.cols())
+        {
+            throw std::invalid_argument(_red +
+                                        "Matrix::operator||() Matrices must have the same dimensions." + _reset);
+        }
+        Matrix<uint8_t> result(rows_, cols_);
+        bool mine, yours;
+        for (size_t i = 0; i < rows_ * cols_; i++)
+        {
+            mine = static_cast<bool>((*this)(i));
+            yours = static_cast<bool>(other(i));
+            result(i) = (mine && yours) ? 1 : 0;
+        }
+        return result;
+    }
+
+    Matrix<uint8_t> operator!() const noexcept
+    {
+
+        Matrix<uint8_t> result(rows_, cols_);
+        bool value;
+        for (size_t i = 0; i < rows_ * cols_; i++)
+        {
+            value = static_cast<bool>((*this)(i));
+            result(i) = value ? 0 : 1;
+        }
+        return result;
+    }
+
+    void operator||(size_t style)
+    {
+        set_print_font(style);
+    }
+
+    void operator|(int v)
+    {
+        set_print_width(v);
+        set_print_precision(v);
+    }
+    /* remova esses operadores acima */
 };
 
 template <typename T>
@@ -2414,4 +2667,4 @@ template <typename T>
     return result;
 }
 
-using Matrixbool = Matrix<uint8_t>;
+using Matrixbool = Matrix<j5r_bool>;

@@ -3,10 +3,7 @@
 #include "MatrixShape.hpp"
 #include "MatrixGen.hpp"
 #include "MatrixLinAlg.hpp"
-//#include <cmath>
-
-
-
+// #include <cmath>
 
 int main()
 {
@@ -18,38 +15,31 @@ int main()
         using gen = MatrixGen;
         using mx = Matrix<double>;
         using mxi = Matrix<int>;
-        mx::set_print_precision(4);
-        mx::set_print_width(4);
+        using mxb = Matrixbool;
 
-        
+        // Matriz Assimétrica (Autovalores conhecidos: 3, 2, 1)
+        mx A = {{7, 0, 0, 9},
+                {-1, 0, 9, 11},
+                {-2, 2, 2, 1},
+                {0, 1, 17, -1}};
 
+        A | 0;
+        A.debug(1);
+        A >> "Matrix A";
+        A.print();
 
+        mxi B = A;
+        B.debug(1);
+        B >> "Matrix B";
+        B.print();
 
-// Matriz Assimétrica (Autovalores conhecidos: 3, 2, 1)
-mx A = {{ 7,  2,  0},
-        {-1,  4,  9},
-        { -2,  2,  2}};
-
-A.print();
-
-
-
-mx autovalores = alg::eigvals_general(A);
-autovalores.print();
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
+        mxb C = A;
+        C.debug(1);
+        C >> "Matrix C";
+        C.print();
+        mxb D = 1 - (mxb)(7 - A);
+        D >> "Matrix D";
+        D.print();
     }
     catch (const std::exception &e)
     {
