@@ -126,7 +126,6 @@ public:
     static_assert(std::is_integral<T>::value, _red + "\nMatrix::randint() Method requires integer types of matrix.\n" + _reset);
 
     Matrix<T> result(nrows, ncols);
-    result.msg("MatrixGen::randi(min=" + std::to_string(min_value) + ", max=" + std::to_string(max_value) + ")");
 
     auto gen = create_engine();
 
@@ -139,11 +138,12 @@ public:
         result(i, j) = static_cast<T>(dis(gen));
       }
     }
+    result >> "MatrixGen::randi(min=" << min_value << ", max=" << max_value << ")";
     return result;
   }
 
   template <typename T>
-  static Matrix<size_t> randd(const Matrix<T> &distribution, size_t nrows, size_t ncols = 1)
+  static Matrix<T> randd(const Matrix<T> &distribution, size_t nrows, size_t ncols = 1)
   {
     if constexpr (!std::is_floating_point_v<T>)
     {
@@ -160,21 +160,22 @@ public:
     {
       distrib = distrib.abs() / sum_up_to_one;
     }
-    distrib = distrib.flatten().cumsum(1);
+    distrib = distrib.flatten().cumsum(Axis::col);
 
-    Matrix<size_t> result(1, nrows * ncols);
-    auto rand_matrix = MatrixGen::rand<float>(1, nrows * ncols);
+    Matrix<T> result(1, nrows * ncols);
+    auto rand_matrix = MatrixGen::rand<double>(1, nrows * ncols);
 
     float r = 0;
     for (size_t index = 0; index < nrows * ncols; index++)
     {
       r = rand_matrix(index);
       auto bool_row = (distrib >= r);
-      auto [max_index, _] = bool_row.max(1);
+      auto [max_index, _] = bool_row.max(Axis::col);
       std::ignore = _;
       result(index) = max_index(0);
     }
-    return result.reshape(nrows,ncols).msg("MatrixGen::randd()");
-    
+    result = result.reshape(nrows, ncols);
+    result >> "MatrixGen::randd(min=0, max=" << distrib.numel()-1 << ")";
+    return result;
   }
 };

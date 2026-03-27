@@ -14,9 +14,8 @@
 #include <typeinfo>
 #include <initializer_list>
 #include <utility>
-#include <iostream>
 #include <cstdint>
-#include <sstream>
+
 #define PI 3.14159265358979323846264338327950288419716939937510
 
 template <typename T>
@@ -57,9 +56,6 @@ public:
         return m;
     }
 };
-
-#include <iostream>
-#include <cstdint>
 
 struct j5r_bool
 {
@@ -190,6 +186,17 @@ inline bool isinf_(T value) noexcept { return std::isinf(value); }
 template <typename T>
 inline bool isnan_(T value) noexcept { return std::isnan(value); }
 
+enum class Axis
+{
+    row = 0,
+    col = 1
+};
+
+namespace detail
+{
+    std::string __which_axis(Axis a) { return (a == Axis::row ? "Axis::row" : "Axis::col"); }
+}
+
 template <typename T>
 class Matrix
 {
@@ -211,11 +218,6 @@ private:
     inline static size_t print_style_ = 1;
 
 public:
-    enum class Axis
-    {
-        row = 0,
-        col = 1
-    };
     friend class MatrixLinAlg;
     // Construtores
     Matrix() : rows_(0), cols_(0) {}
@@ -230,6 +232,8 @@ public:
         Matrix<T> result(other.rows(), other.cols());
         for (size_t i = 0; i < other.rows() * other.cols(); i++)
             result(i) = static_cast<T>(other(i));
+
+        result >> other.get_comment();
         *this = result;
     }
     // --- CONVERSAO EXPLICITA DE CASTING
@@ -238,11 +242,12 @@ public:
     operator Matrix<U>() const
     {
         Matrix<U> result(rows_, cols_);
-        for (int i = 0; i < rows_ * cols_; ++i)
+        for (int i = 0; i < numel(); ++i)
         {
             // O static_cast garante a conversão segura entre tipos (ex: int -> double)
             result.data_[i] = static_cast<U>(this->data_[i]);
         }
+
         return result;
     }
 
@@ -277,7 +282,7 @@ public:
             size_t j = 0;
             for (const auto &val : row_list)
             {
-                this->operator()(i, j) = val;
+                (*this)(i, j) = val;
                 j++;
             }
             i++;
@@ -291,6 +296,7 @@ public:
     static void set_print_font(size_t style_int) noexcept { Matrix<T>::print_style_ = (style_int % 9) + 1; }
     static void set_print_debug(bool debug) noexcept { print_debug_ = debug; }
     static void debug(bool d) { print_debug_ = d; };
+    std::string get_comment() const noexcept { return comment; }
     size_t rows() const noexcept { return rows_; }
     size_t cols() const noexcept { return cols_; }
     size_t ilrow() const noexcept { return rows_ - 1; }                                               // index of last row (ilrow)
@@ -312,7 +318,7 @@ public:
         {
             for (size_t j = i + 1; j < cols_; j++)
             {
-                if (std::abs(this->operator()(i, j) - this->operator()(j, i)) > 1e-14)
+                if (std::abs(static_cast<double>((*this)(i, j)) - static_cast<double>((*this)(j, i))) > 1e-14)
                     return false;
             }
         }
@@ -346,13 +352,13 @@ public:
     {
         auto index_in = index;
         if (index < 0)
-            index += rows() * cols();
-        if (index < 0 || index >= rows() * cols())
+            index += numel();
+        if (index < 0 || index >= numel())
         {
-            int from_index = -rows() * cols();
+            int from_index = -numel();
             throw std::out_of_range(
                 _red + "Matrix::set() index out of range.\nRange is\n  index[" +
-                std::to_string(from_index) + " (same as first item), " + std::to_string(rows() * cols() - 1) + " (same as last item)],\n  but got index=" +
+                std::to_string(from_index) + " (same as first item), " + std::to_string(numel() - 1) + " (same as last item)],\n  but got index=" +
                 std::to_string(index_in) + "." + _reset);
         }
         data_[index] = value;
@@ -383,13 +389,13 @@ public:
     {
         auto index_in = index;
         if (index < 0)
-            index += rows() * cols();
-        if (index < 0 || index >= rows() * cols())
+            index += numel();
+        if (index < 0 || index >= numel())
         {
-            int from_index = -rows() * cols();
+            int from_index = -numel();
             throw std::out_of_range(
                 _red + "Matrix::get() index out of range.\nRange is\n  index[" +
-                std::to_string(from_index) + " (same as first item), " + std::to_string(rows() * cols() - 1) + " (same as last item)],\n  but got index=" +
+                std::to_string(from_index) + " (same as first item), " + std::to_string(numel() - 1) + " (same as last item)],\n  but got index=" +
                 std::to_string(index_in) + "." + _reset);
         }
         return data_[index];
@@ -407,7 +413,7 @@ public:
             for (size_t j = 0; j < cols_; ++j)
             {
                 std::cout << "(" << i << ", " << j << "):\t";
-                std::cin >> this->operator()(i, j);
+                std::cin >> (*this)(i, j);
             }
         }
     }
@@ -638,7 +644,7 @@ public:
         {
             for (size_t j = 0; j < cols_; ++j)
             {
-                file << this->operator()(i, j);
+                file << (*this)(i, j);
                 // [Evita colocar o separador no final da linha, mantendo o CSV limpo]
                 if (j < cols_ - 1)
                 {
@@ -769,74 +775,77 @@ public:
         {
             for (size_t j = 0; j < cols_; ++j)
             {
-                result(j, i) = this->operator()(i, j); // Transpõe os elementos
+                result(j, i) = (*this)(i, j); // Transpõe os elementos
             }
         }
 
         return result;
     }
 
-    [[nodiscard]] Matrix<T> sum(Axis axis = Axis::row) const
+    // Define o tipo de retorno da soma: se T for j5r_bool, usa size_t. Senão, usa T.
+    using SumType = typename std::conditional<std::is_same<T, j5r_bool>::value, size_t, T>::type;
+
+    // Agora o sum() retorna uma Matrix<SumType> em vez de Matrix<T>
+    [[nodiscard]] Matrix<SumType> sum(Axis axis = Axis::row) const
     {
         if (axis == Axis::row)
         {
-            // Soma ao longo das colunas, resultando em um vetor linha
-            Matrix<T> result(1, cols_);
-
-            for (size_t j = 0; j < cols_; ++j)
+            Matrix<SumType> result(1, cols_, SumType(0));
+            for (size_t j = 0; j < cols_; j++)
             {
-                T sum = T();
-                for (size_t i = 0; i < rows_; ++i)
+                for (size_t i = 0; i < rows_; i++)
                 {
-                    sum += this->operator()(i, j);
+                    // O static_cast garante que o 1 (booleano) vire 1 (inteiro) antes de somar
+                    result(0, j) += static_cast<SumType>((*this)(i, j));
                 }
-                result(0, j) = sum;
             }
-
+            result >> get_comment() << ".Matrix::sum(Axis::row)";
             return result;
         }
         else if (axis == Axis::col)
-        {
-            // Soma ao longo das linhas, resultando em um vetor coluna
-            Matrix<T> result(rows_, 1);
-
-            for (size_t i = 0; i < rows_; ++i)
+        { // Axis::col
+            Matrix<SumType> result(rows_, 1, SumType(0));
+            for (size_t i = 0; i < rows_; i++)
             {
-                T sum = T();
-                for (size_t j = 0; j < cols_; ++j)
+                for (size_t j = 0; j < cols_; j++)
                 {
-                    sum += this->operator()(i, j);
+                    result(i, 0) += static_cast<SumType>((*this)(i, j));
                 }
-                result(i, 0) = sum;
             }
-
+            result >> get_comment() << ".Matrix::sum(Axis::col)";
             return result;
         }
         else
         {
-            throw std::invalid_argument(_red + "\nMatrix::sum() Error: Axis must be 0 (sum each column, return a row vector)\nor 1 (sum each row, return a column vector).\n" + _reset);
+            throw std::invalid_argument(_red + "\nMatrix::sum() Error: Axis must be Axis::row (sum each column, return a row vector)\nor Axis::col (sum each row, return a column vector).\n" + _reset);
         }
     }
 
-    [[nodiscard]] T sumsum() noexcept
+    // A função passa a retornar SumType em vez de T
+    SumType sumsum() const
     {
-        Matrix<T> temp = sum();
-        temp = temp.sum(Axis::col);
-        return temp(0, 0);
+        SumType total = 0; // O acumulador agora é livre para crescer!
+
+        for (size_t i = 0; i < numel(); i++)
+        {
+            // O cast liberta o bit transformando-o em inteiro antes de somar
+            total += static_cast<SumType>(data_[i]);
+        }
+
+        return total;
     }
 
     [[nodiscard]] Matrix<T> cumsum(Axis axis = Axis::row) const
     {
-        if (axis != 0 && axis != 1)
+        if (axis != Axis::row && axis != Axis::col)
         {
             throw std::invalid_argument(
-                _red + "Matrix::cumsum() Error: Axis must be 0 or 1." + _reset);
+                _red + "Matrix::cumsum() Error: Axis must be Axis::row or Axis::col." + _reset);
         }
 
         Matrix<T> result = *this;
-        result >> "cumsum()";
 
-        if (axis == 0)
+        if (axis == Axis::row)
         {
             for (size_t i = 0; i < rows(); i++)
             {
@@ -847,6 +856,7 @@ public:
                     result(i, j) += result(i - 1, j);
                 }
             }
+            result >> get_comment() << ".Matrix::cumsum(Axis::row)";
             return result;
         }
         else
@@ -860,6 +870,7 @@ public:
                     result(i, j) += result(i, j - 1);
                 }
             }
+            result >> get_comment() << ".Matrix::cumsum(Axis::col)";
             return result;
         }
     }
@@ -884,7 +895,7 @@ public:
                 sum_result(i, 0) /= static_cast<T>(this->cols());
             }
         }
-
+        sum_result >> get_comment() << ".Matrix::mean(" << detail::__which_axis(axis) << ")";
         return sum_result;
     }
 
@@ -900,7 +911,7 @@ public:
                 T sum_squared_diff = T();
                 for (size_t i = 0; i < this->rows(); ++i)
                 {
-                    T diff = this->operator()(i, j) - mean_result(0, j);
+                    T diff = (*this)(i, j) - mean_result(0, j);
                     sum_squared_diff += diff * diff;
                 }
                 var_result(0, j) = sum_squared_diff / static_cast<T>(this->rows());
@@ -913,13 +924,13 @@ public:
                 T sum_squared_diff = T();
                 for (size_t j = 0; j < this->cols(); ++j)
                 {
-                    T diff = this->operator()(i, j) - mean_result(i, 0);
+                    T diff = (*this)(i, j) - mean_result(i, 0);
                     sum_squared_diff += diff * diff;
                 }
                 var_result(i, 0) = sum_squared_diff / static_cast<T>(this->cols());
             }
         }
-
+        var_result >> get_comment() << ".Matrix::var(" << detail::__which_axis(axis) << ")";
         return var_result;
     }
 
@@ -935,7 +946,7 @@ public:
                 std_result(i, j) = std::sqrt(var_result(i, j));
             }
         }
-
+        std_result >> get_comment() << ".Matrix::std(" << detail::__which_axis(axis) << ")";
         return std_result;
     }
 
@@ -953,7 +964,7 @@ public:
         {
             for (size_t j = 0; j < cols_; ++j)
             {
-                result(i - start, j) = this->operator()(i, j);
+                result(i - start, j) = (*this)(i, j);
             }
         }
 
@@ -986,7 +997,7 @@ public:
         {
             for (size_t j = start; j < end; ++j)
             {
-                result(i, j - start) = this->operator()(i, j);
+                result(i, j - start) = (*this)(i, j);
             }
         }
 
@@ -1007,11 +1018,11 @@ public:
 
     [[nodiscard]] Matrix<T> reshape(size_t new_rows, size_t new_cols) const
     {
-        if (new_rows * new_cols != rows_ * cols_)
+        if (new_rows * new_cols != numel())
         {
             throw std::invalid_argument(_red + "\nMatrix::reshape() Error: New dimensions must contain the same total number of elements.\nGot " +
                                         std::to_string(new_rows) + "x" + std::to_string(new_cols) + " = " + std::to_string(new_rows * new_cols) + " but expected " +
-                                        std::to_string(rows_ * cols_) + " elements. Current size is " + size() + "." + _reset);
+                                        std::to_string(numel()) + " elements. Current size is " + size() + "." + _reset);
         }
 
         Matrix<T> result(new_rows, new_cols);
@@ -1023,7 +1034,7 @@ public:
                 size_t index = i * cols_ + j;
                 size_t new_i = index / new_cols;
                 size_t new_j = index % new_cols;
-                result(new_i, new_j) = this->operator()(i, j);
+                result(new_i, new_j) = (*this)(i, j);
             }
         }
 
@@ -1049,7 +1060,7 @@ public:
             }
             for (size_t j = 0; j < cols_; ++j)
             {
-                result(new_i, j) = this->operator()(i, j);
+                result(new_i, j) = (*this)(i, j);
             }
             new_i++;
         }
@@ -1088,7 +1099,7 @@ public:
                 {
                     continue; // Pula as colunas que devem ser removidas
                 }
-                result(i, new_j) = this->operator()(i, j);
+                result(i, new_j) = (*this)(i, j);
                 new_j++;
             }
         }
@@ -1112,7 +1123,7 @@ public:
     {
         Matrix<T> result = *this;
         result.rows_ = 1;
-        result.cols_ = rows() * cols();
+        result.cols_ = numel();
         return result;
     }
 
@@ -1121,7 +1132,7 @@ public:
     {
         if (other.is_scalar())
         {
-            return operator+(other(0, 0));
+            return operator+(other(0));
         }
         if (rows_ != other.rows() || cols_ != other.cols())
         {
@@ -1130,14 +1141,10 @@ public:
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
 
-        for (size_t i = 0; i < rows_; ++i)
+        for (size_t i = 0; i < numel(); ++i)
         {
-            for (size_t j = 0; j < cols_; ++j)
-            {
-                result(i, j) = this->operator()(i, j) + other(i, j);
-            }
+            result.data_[i] = data_[i] + other.data_[i];
         }
-
         return result;
     }
 
@@ -1147,12 +1154,9 @@ public:
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
 
-        for (size_t i = 0; i < rows_; ++i)
+        for (size_t i = 0; i < numel(); ++i)
         {
-            for (size_t j = 0; j < cols_; ++j)
-            {
-                result(i, j) = this->operator()(i, j) + scalar;
-            }
+            result.data_[i] = data_[i] + scalar;
         }
 
         return result;
@@ -1163,7 +1167,7 @@ public:
     {
         if (other.is_scalar())
         {
-            return operator-(other(0, 0));
+            return operator-(other(0));
         }
         if (rows_ != other.rows() || cols_ != other.cols())
         {
@@ -1172,12 +1176,9 @@ public:
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
 
-        for (size_t i = 0; i < rows_; ++i)
+        for (size_t i = 0; i < numel(); ++i)
         {
-            for (size_t j = 0; j < cols_; ++j)
-            {
-                result(i, j) = this->operator()(i, j) - other(i, j);
-            }
+            result.data_[i] = data_[i] - other.data_[i];
         }
 
         return result;
@@ -1189,12 +1190,9 @@ public:
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
 
-        for (size_t i = 0; i < rows_; ++i)
+        for (size_t i = 0; i < numel(); ++i)
         {
-            for (size_t j = 0; j < cols_; ++j)
-            {
-                result(i, j) = this->operator()(i, j) - scalar;
-            }
+            result.data_[i] = data_[i] - scalar;
         }
 
         return result;
@@ -1236,9 +1234,9 @@ public:
         using ResultType = std::common_type_t<T, U>;
         Matrix<ResultType> result(rows_, cols_);
 
-        for (size_t i = 0; i < rows_ * cols_; ++i)
+        for (size_t i = 0; i < numel(); ++i)
         {
-            result(i) = (*this)(i)*scalar;
+            result(i) = data_[i] * scalar;
         }
 
         return result;
@@ -1255,27 +1253,25 @@ public:
         if (scalar == U()) // den 0
         {
 
-            for (size_t i = 0; i < rows_; ++i)
+            for (size_t i = 0; i < numel(); ++i)
             {
-                for (size_t j = 0; j < cols_; ++j)
+
+                auto numerator = data_[i];
+                if (numerator == T()) // num 0
                 {
-                    auto numerator = this->operator()(i, j);
-                    if (numerator == T()) // num 0
-                    {
-                        result(i, j) = nan;
-                    }
-                    else if (isinf_(numerator)) // num inf
-                    {
-                        result(i, j) = nan;
-                    }
-                    else if (isnan_(numerator)) // num nan
-                    {
-                        result(i, j) = nan;
-                    }
-                    else
-                    {
-                        result(i, j) = numerator > 0 ? inf : -inf;
-                    }
+                    result.data_[i] = nan;
+                }
+                else if (isinf_(numerator)) // num inf
+                {
+                    result.data_[i] = nan;
+                }
+                else if (isnan_(numerator)) // num nan
+                {
+                    result.data_[i] = nan;
+                }
+                else
+                {
+                    result.data_[i] = numerator > 0 ? inf : -inf;
                 }
             }
             return result;
@@ -1283,27 +1279,25 @@ public:
 
         if (isinf_(scalar)) // den inf
         {
-            for (size_t i = 0; i < rows_; ++i)
+            for (size_t i = 0; i < numel(); ++i)
             {
-                for (size_t j = 0; j < cols_; ++j)
+
+                auto numerator = data_[i];
+                if (isinf_(numerator))
                 {
-                    auto numerator = this->operator()(i, j);
-                    if (isinf_(numerator))
-                    {
-                        result(i, j) = nan; // Inf dividido por Inf é indeterminado (NaN)
-                    }
-                    else if (isnan_(numerator))
-                    {
-                        result(i, j) = nan; // NaN dividido por Inf é indeterminado (NaN)
-                    }
-                    else if (numerator == T())
-                    {
-                        result(i, j) = nan; // 0 dividido por Inf é indeterminado (NaN)
-                    }
-                    else
-                    {
-                        result(i, j) = 0; // Qualquer número finito dividido por infinito é zero
-                    }
+                    result.data_[i] = nan; // Inf dividido por Inf é indeterminado (NaN)
+                }
+                else if (isnan_(numerator))
+                {
+                    result.data_[i] = nan; // NaN dividido por Inf é indeterminado (NaN)
+                }
+                else if (numerator == T())
+                {
+                    result.data_[i] = nan; // 0 dividido por Inf é indeterminado (NaN)
+                }
+                else
+                {
+                    result.data_[i] = 0; // Qualquer número finito dividido por infinito é zero
                 }
             }
             return result;
@@ -1311,22 +1305,18 @@ public:
 
         if (isnan_(scalar)) // den NaN
         {
-            for (size_t i = 0; i < rows_; ++i)
+            for (size_t i = 0; i < numel(); ++i)
             {
-                for (size_t j = 0; j < cols_; ++j)
-                {
-                    result(i, j) = nan; // Qualquer número dividido por NaN é NaN
-                }
+
+                result.data_[i] = nan; // Qualquer número dividido por NaN é NaN
             }
             return result;
         }
 
-        for (size_t i = 0; i < rows_; ++i)
+        for (size_t i = 0; i < numel(); ++i)
         {
-            for (size_t j = 0; j < cols_; ++j)
-            {
-                result(i, j) = this->operator()(i, j) / scalar;
-            }
+
+            result.data_[i] = data_[i] / scalar;
         }
 
         return result;
@@ -1337,7 +1327,7 @@ public:
     {
         if (other.is_scalar())
         {
-            return operator/(other(0, 0));
+            return operator/(other(0));
         }
         if (cols_ != other.cols() || rows_ != other.rows())
         {
@@ -1350,59 +1340,57 @@ public:
         ResultType inf = inf_<ResultType>();
         ResultType nan = nan_<ResultType>();
 
-        for (size_t i = 0; i < rows_; ++i)
+        for (size_t i = 0; i < numel(); ++i)
         {
-            for (size_t j = 0; j < cols_; ++j)
-            {
-                U denominator = other(i, j);
-                auto numerator = this->operator()(i, j);
 
-                if (denominator == U()) // den 0
+            U denominator = other.data_[i];
+            auto numerator = data_[i];
+
+            if (denominator == U()) // den 0
+            {
+                if (numerator == T()) // num 0
                 {
-                    if (numerator == T()) // num 0
-                    {
-                        result(i, j) = nan;
-                    }
-                    else if (isinf_(numerator)) // num inf
-                    {
-                        result(i, j) = nan;
-                    }
-                    else if (isnan_(numerator)) // num nan
-                    {
-                        result(i, j) = nan;
-                    }
-                    else
-                    {
-                        result(i, j) = (numerator / denominator) >= 0 ? inf : -inf;
-                    }
+                    result.data_[i] = nan;
                 }
-                else if (isinf_(denominator)) // den inf
+                else if (isinf_(numerator)) // num inf
                 {
-                    if (numerator == T()) // num 0
-                    {
-                        result(i, j) = nan;
-                    }
-                    else if (isinf_(numerator)) // num inf
-                    {
-                        result(i, j) = nan;
-                    }
-                    else if (isnan_(numerator)) // num nan
-                    {
-                        result(i, j) = nan;
-                    }
-                    else
-                    {
-                        result(i, j) = 0;
-                    }
+                    result.data_[i] = nan;
                 }
-                else if (isnan_(denominator)) // den nan
+                else if (isnan_(numerator)) // num nan
                 {
-                    result(i, j) = nan;
+                    result.data_[i] = nan;
                 }
                 else
                 {
-                    result(i, j) = numerator / denominator;
+                    result.data_[i] = (numerator / denominator) >= 0 ? inf : -inf;
                 }
+            }
+            else if (isinf_(denominator)) // den inf
+            {
+                if (numerator == T()) // num 0
+                {
+                    result.data_[i] = nan;
+                }
+                else if (isinf_(numerator)) // num inf
+                {
+                    result.data_[i] = nan;
+                }
+                else if (isnan_(numerator)) // num nan
+                {
+                    result.data_[i] = nan;
+                }
+                else
+                {
+                    result.data_[i] = 0;
+                }
+            }
+            else if (isnan_(denominator)) // den nan
+            {
+                result.data_[i] = nan;
+            }
+            else
+            {
+                result.data_[i] = (numerator == T(0)) ? T(0) : numerator / denominator;
             }
         }
         return result;
@@ -1422,11 +1410,11 @@ public:
     friend auto operator-(const U &scalar, const Matrix<T> &m) -> Matrix<std::common_type_t<U, T>>
     {
         using ResultType = std::common_type_t<U, T>;
-        Matrix<ResultType> result(m.rows(), m.cols());
+        Matrix<ResultType> result(m.rows_, m.cols_);
 
-        for (size_t i = 0; i < m.rows() * m.cols(); ++i)
+        for (size_t i = 0; i < m.rows_ * m.cols_; ++i)
         {
-            result(i) = scalar - m(i); // Aqui a ordem dita a matemática correta
+            result.data_[i] = scalar - m.data_[i]; // Aqui a ordem dita a matemática correta
         }
         return result;
     }
@@ -1509,7 +1497,7 @@ public:
                     }
                     else
                     {
-                        result(i, j) = scalar / denominator; // Divisão normal para casos normais
+                        result(i, j) = (scalar == 0) ? 0 : scalar / denominator; // Divisão normal para casos normais
                     }
                 }
             }
@@ -1526,30 +1514,24 @@ public:
 
         if constexpr (std::is_integral_v<T>)
         {
-            for (size_t i = 0; i < rows(); i++)
+            for (size_t i = 0; i < numel(); i++)
             {
-                for (size_t j = 0; j < cols(); j++)
-                {
-                    if (this->operator()(i, j) != other(i, j))
-                        return false;
-                }
+                if (data_[i] != other.data_[i])
+                    return false;
             }
             return true;
         }
 
-        T sum_ = T();
-        for (size_t i = 0; i < rows_; ++i)
+        T sum_ = T(), diff = T();
+        for (size_t i = 0; i < numel(); ++i)
         {
-            for (size_t j = 0; j < cols_; ++j)
-            {
 
-                T diff = this->operator()(i, j) - other(i, j);
-                diff = (diff >= 0) ? diff : -diff;
-                sum_ += diff;
-                if (sum_ > tolerance)
-                {
-                    return false;
-                }
+            diff = data_[i] - other.data_[i];
+            diff = (diff >= 0) ? diff : -diff;
+            sum_ += diff;
+            if (sum_ > tolerance)
+            {
+                return false;
             }
         }
 
@@ -1558,7 +1540,7 @@ public:
     [[nodiscard]] Matrix<T> operator-() const
     {
         Matrix<T> result(rows_, cols_);
-        for (size_t i = 0; i < data_.size(); i++)
+        for (size_t i = 0; i < numel(); i++)
         {
             result.data_[i] = -data_[i];
         }
@@ -1578,7 +1560,7 @@ public:
         {
             for (size_t j = 0; j < cols_; ++j)
             {
-                result(i, j) = this->operator()(i, j) * other(i, j);
+                result(i, j) = (*this)(i, j) * other(i, j);
             }
         }
 
@@ -1687,18 +1669,18 @@ public:
 
         std::cout << _yellow << "\n[Relational and Logical Operators]\n"
                   << _reset
-                  << "  M1 == M2            : Returns a Matrixbool (uint8_t) with 1 where elements are equal.\n"
-                  << "  M1 > M2             : Returns a Matrixbool (uint8_t) with 1 where M1 > M2.\n"
-                  << "  M1 < M2             : Returns a Matrixbool (uint8_t) with 1 where M1 < M2.\n"
-                  << "  M1 >= M2            : Returns a Matrixbool (uint8_t) with 1 where M1 >= M2.\n"
-                  << "  M1 <= M2            : Returns a Matrixbool (uint8_t) with 1 where M1 <= M2.\n"
-                  << "  M1 != M2            : Returns a Matrixbool (uint8_t) with 1 where elements are different.\n"
-                  << "  M1 == scalar        : Returns a Matrixbool (uint8_t) with 1 where elements are equal.\n"
-                  << "  M1 > scalar         : Returns a Matrixbool (uint8_t) with 1 where M1 > scalar.\n"
-                  << "  M1 < scalar         : Returns a Matrixbool (uint8_t) with 1 where M1 < scalar.\n"
-                  << "  M1 >= scalar        : Returns a Matrixbool (uint8_t) with 1 where M1 >= scalar.\n"
-                  << "  M1 <= scalar        : Returns a Matrixbool (uint8_t) with 1 where M1 <= scalar.\n"
-                  << "  M1 != scalar        : Returns a Matrixbool (uint8_t) with 1 where M1 != M2.\n"
+                  << "  M1 == M2            : Returns a Matrixbool (j5r_bool) with 1 where elements are equal.\n"
+                  << "  M1 > M2             : Returns a Matrixbool (j5r_bool) with 1 where M1 > M2.\n"
+                  << "  M1 < M2             : Returns a Matrixbool (j5r_bool) with 1 where M1 < M2.\n"
+                  << "  M1 >= M2            : Returns a Matrixbool (j5r_bool) with 1 where M1 >= M2.\n"
+                  << "  M1 <= M2            : Returns a Matrixbool (j5r_bool) with 1 where M1 <= M2.\n"
+                  << "  M1 != M2            : Returns a Matrixbool (j5r_bool) with 1 where elements are different.\n"
+                  << "  M1 == scalar        : Returns a Matrixbool (j5r_bool) with 1 where elements are equal.\n"
+                  << "  M1 > scalar         : Returns a Matrixbool (j5r_bool) with 1 where M1 > scalar.\n"
+                  << "  M1 < scalar         : Returns a Matrixbool (j5r_bool) with 1 where M1 < scalar.\n"
+                  << "  M1 >= scalar        : Returns a Matrixbool (j5r_bool) with 1 where M1 >= scalar.\n"
+                  << "  M1 <= scalar        : Returns a Matrixbool (j5r_bool) with 1 where M1 <= scalar.\n"
+                  << "  M1 != scalar        : Returns a Matrixbool (j5r_bool) with 1 where M1 != M2.\n"
                   << "  .is(M2)             : Checks if two matrices point to the same memory address.\n";
         std::cin.get();
 
@@ -1790,12 +1772,21 @@ public:
     Matrix<j5r_bool> operator>(const U &scalar) const
     {
         Matrix<j5r_bool> result(rows_, cols_);
-        for (size_t i = 0; i < rows_; i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            for (size_t j = 0; j < cols_; j++)
-            {
-                result.set(i, j, this->operator()(i, j) > scalar);
-            }
+            result(i) = data_[i] > scalar;
+        }
+        return result;
+    }
+
+    template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
+    friend Matrix<j5r_bool> operator>(const U &scalar, const Matrix<T> &m)
+    {
+        Matrix<j5r_bool> result(m.rows(), m.cols());
+        for (size_t i = 0; i < m.numel(); i++)
+        {
+
+            result(i) = scalar > m(i);
         }
         return result;
     }
@@ -1804,12 +1795,22 @@ public:
     Matrix<j5r_bool> operator>=(const U &scalar) const
     {
         Matrix<j5r_bool> result(rows_, cols_);
-        for (size_t i = 0; i < rows_; i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            for (size_t j = 0; j < cols_; j++)
-            {
-                result.set(i, j, this->operator()(i, j) >= scalar);
-            }
+
+            result(i) = data_[i] >= scalar;
+        }
+        return result;
+    }
+
+    template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
+    friend Matrix<j5r_bool> operator>=(const U &scalar, const Matrix<T> &m)
+    {
+        Matrix<j5r_bool> result(m.rows(), m.cols());
+        for (size_t i = 0; i < m.numel(); i++)
+        {
+
+            result(i) = scalar >= m(i);
         }
         return result;
     }
@@ -1818,12 +1819,21 @@ public:
     Matrix<j5r_bool> operator<(const U &scalar) const
     {
         Matrix<j5r_bool> result(rows_, cols_);
-        for (size_t i = 0; i < rows_; i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            for (size_t j = 0; j < cols_; j++)
-            {
-                result.set(i, j, this->operator()(i, j) < scalar);
-            }
+            result(i) = data_[i] < scalar;
+        }
+        return result;
+    }
+
+    template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
+    friend Matrix<j5r_bool> operator<(const U &scalar, const Matrix<T> &m)
+    {
+        Matrix<j5r_bool> result(m.rows(), m.cols());
+        for (size_t i = 0; i < m.numel(); i++)
+        {
+
+            result(i) = scalar < m(i);
         }
         return result;
     }
@@ -1832,12 +1842,21 @@ public:
     Matrix<j5r_bool> operator<=(const U &scalar) const
     {
         Matrix<j5r_bool> result(rows_, cols_);
-        for (size_t i = 0; i < rows_; i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            for (size_t j = 0; j < cols_; j++)
-            {
-                result.set(i, j, this->operator()(i, j) <= scalar);
-            }
+
+            result(i) = data_[i] <= scalar;
+        }
+        return result;
+    }
+    template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
+    friend Matrix<j5r_bool> operator<=(const U &scalar, const Matrix<T> &m)
+    {
+        Matrix<j5r_bool> result(m.rows(), m.cols());
+        for (size_t i = 0; i < m.numel(); i++)
+        {
+
+            result(i) = scalar <= m(i);
         }
         return result;
     }
@@ -1846,28 +1865,37 @@ public:
     Matrix<j5r_bool> operator==(const U &scalar) const
     {
         Matrix<j5r_bool> result(rows_, cols_);
-        for (size_t i = 0; i < rows_; i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            for (size_t j = 0; j < cols_; j++)
-            {
-                result.set(i, j, this->operator()(i, j) == scalar);
-            }
+            result(i) = data_[i] == scalar;
         }
         return result;
+    }
+
+    template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
+    friend Matrix<j5r_bool> operator==(const U &scalar, const Matrix<T> &m)
+    {
+
+        return m == scalar;
     }
 
     template <typename U>
     Matrix<j5r_bool> operator!=(const U &scalar) const
     {
         Matrix<j5r_bool> result(rows_, cols_);
-        for (size_t i = 0; i < rows_; i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            for (size_t j = 0; j < cols_; j++)
-            {
-                result.set(i, j, this->operator()(i, j) != scalar);
-            }
+
+            result(i) = data_[i] != scalar;
         }
         return result;
+    }
+
+    template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
+    friend Matrix<j5r_bool> operator!=(const U &scalar, const Matrix<T> &m)
+    {
+
+        return m != scalar;
     }
 
     template <typename U>
@@ -1887,7 +1915,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->operator()(i, j) > other(i, j));
+                result(i, j) = (*this)(i, j) > other(i, j);
             }
         }
         return result;
@@ -1910,7 +1938,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->operator()(i, j) < other(i, j));
+                result(i, j) = (*this)(i, j) < other(i, j);
             }
         }
         return result;
@@ -1933,7 +1961,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->operator()(i, j) >= other(i, j));
+                result(i, j) = (*this)(i, j) >= other(i, j);
             }
         }
         return result;
@@ -1956,7 +1984,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->operator()(i, j) <= other(i, j));
+                result(i, j) = (*this)(i, j) <= other(i, j);
             }
         }
         return result;
@@ -1979,7 +2007,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->operator()(i, j) == other(i, j));
+                result(i, j) = (*this)(i, j) == other(i, j);
             }
         }
         return result;
@@ -2002,7 +2030,7 @@ public:
         {
             for (size_t j = 0; j < cols_; j++)
             {
-                result.set(i, j, this->operator()(i, j) != other(i, j));
+                result(i, j) = (*this)(i, j) != other(i, j);
             }
         }
         return result;
@@ -2063,7 +2091,7 @@ public:
         file.close();
     }
 
-    [[nodiscard]] Matrix<T> operator()(const Matrix<uint8_t> &boolMatrix) const
+    [[nodiscard]] Matrix<T> operator()(const Matrix<j5r_bool> &boolMatrix) const
     {
         if (boolMatrix.rows() != rows_ || boolMatrix.cols() != cols_)
         {
@@ -2073,6 +2101,7 @@ public:
         }
 
         Matrix<T> result;
+        result.rows_ = 1;
 
         for (size_t i = 0; i < rows_; i++)
         {
@@ -2080,18 +2109,17 @@ public:
             {
                 if (boolMatrix(i, j))
                 {
-                    result.data_.push_back(this->operator()(i, j));
+                    result.data_.push_back((*this)(i, j));
                     result.cols_ += 1;
-                    result.rows_ = 1;
                 }
             }
         }
         return result;
     }
 
-    [[nodiscard]] std::pair<Matrix<size_t>, Matrix<T>> min(uint8_t axis = 0) const
+    [[nodiscard]] std::pair<Matrix<size_t>, Matrix<T>> min(Axis axis = Axis::row) const
     {
-        if (axis == 0) // Mínimo de cada COLUNA (Resulta em 1xCols)
+        if (axis == Axis::row) // Mínimo de cada COLUNA (Resulta em 1xCols)
         {
             Matrix<size_t> result_idx(1, cols());
             Matrix<T> result_val(1, cols());
@@ -2103,9 +2131,9 @@ public:
 
                 for (size_t i = 1; i < rows(); i++)
                 {
-                    if (this->operator()(i, j) < min_val)
+                    if ((*this)(i, j) < min_val)
                     {
-                        min_val = this->operator()(i, j);
+                        min_val = (*this)(i, j);
                         best_idx = i;
                     }
                 }
@@ -2113,11 +2141,11 @@ public:
                 result_val(0, j) = min_val;
             }
 
-            result_idx >> "min idx | axis = " << (bool)axis;
-            result_val >> "min val | axis = " << (bool)axis;
+            result_idx >> ".Matrix::min() idx | axis = Axis::" << (axis == Axis::row ? "row" : "col");
+            result_val >> ".Matrix::min() val | axis = Axis::" << (axis == Axis::row ? "row" : "col");
             return {result_idx, result_val};
         }
-        else if (axis == 1) // Mínimo de cada LINHA (Resulta em Rowsx1)
+        else if (axis == Axis::col) // Mínimo de cada LINHA (Resulta em Rowsx1)
         {
             // CORREÇÃO 1: Mudado de Matrix<int> para Matrix<size_t>
             Matrix<size_t> result_idx(rows(), 1);
@@ -2136,8 +2164,8 @@ public:
                 result_val(i, 0) = *it_min;
             }
 
-            result_idx >> "min idx | axis = " << (bool)axis;
-            result_val >> "min val | axis = " << (bool)axis;
+            result_idx >> ".Matrix::min() idx | axis = Axis::" << (axis == Axis::row ? "row" : "col");
+            result_val >> ".Matrix::min() val | axis = Axis::" << (axis == Axis::row ? "row" : "col");
             return {result_idx, result_val};
         }
         else
@@ -2146,9 +2174,9 @@ public:
         }
     }
 
-    [[nodiscard]] std::pair<Matrix<size_t>, Matrix<T>> max(uint8_t axis = 0) const
+    [[nodiscard]] std::pair<Matrix<size_t>, Matrix<T>> max(Axis axis = Axis::row) const
     {
-        if (axis == 0) // Máximo de cada COLUNA (Resulta em 1xCols)
+        if (axis == Axis::row) // Máximo de cada COLUNA (Resulta em 1xCols)
         {
             Matrix<size_t> result_idx(1, cols());
             Matrix<T> result_val(1, cols());
@@ -2161,9 +2189,9 @@ public:
                 for (size_t i = 1; i < rows(); i++)
                 {
                     // A única diferença para o min() é este sinal de MAIOR (>)
-                    if (this->operator()(i, j) > max_val)
+                    if ((*this)(i, j) > max_val)
                     {
-                        max_val = this->operator()(i, j);
+                        max_val = (*this)(i, j);
                         best_idx = i;
                     }
                 }
@@ -2171,11 +2199,11 @@ public:
                 result_val(0, j) = max_val;
             }
 
-            result_idx >> "max idx | axis = " << (bool)axis;
-            result_val >> "max val | axis = " << (bool)axis;
+            result_idx >> ".Matrix::max() idx | axis = Axis::" << (axis == Axis::row ? "row" : "col");
+            result_val >> ".Matrix::max() val | axis = Axis::" << (axis == Axis::row ? "row" : "col");
             return {result_idx, result_val};
         }
-        else if (axis == 1) // Máximo de cada LINHA (Resulta em Rowsx1)
+        else if (axis == Axis::col) // Máximo de cada LINHA (Resulta em Rowsx1)
         {
             Matrix<size_t> result_idx(rows(), 1);
             Matrix<T> result_val(rows(), 1);
@@ -2194,8 +2222,8 @@ public:
                 result_val(i, 0) = *it_max; // Desreferencia o iterador para obter o valor
             }
 
-            result_idx >> "max idx | axis = " << (bool)axis;
-            result_val >> "max val | axis = " << (bool)axis;
+            result_idx >> ".Matrix::max() idx | axis = Axis::" << (axis == Axis::row ? "row" : "col");
+            result_val >> ".Matrix::max() val | axis = Axis::" << (axis == Axis::row ? "row" : "col");
             return {result_idx, result_val};
         }
         else
@@ -2231,7 +2259,7 @@ public:
 
         if (is_scalar() && (!other.is_scalar()))
         {
-            T scalar = this->operator()(0);
+            T scalar = data_[0];
             *this = other;
             this->operator+=(scalar);
             return *this;
@@ -2333,7 +2361,7 @@ public:
 
     Matrix<T> &operator+=(T scalar) noexcept
     {
-        for (size_t i = 0; i < rows() * cols(); i++)
+        for (size_t i = 0; i < numel(); i++)
         {
             this->data_[i] += scalar;
         }
@@ -2342,7 +2370,7 @@ public:
 
     Matrix<T> &operator-=(T scalar) noexcept
     {
-        for (size_t i = 0; i < rows() * cols(); i++)
+        for (size_t i = 0; i < numel(); i++)
         {
             this->data_[i] -= scalar;
         }
@@ -2351,7 +2379,7 @@ public:
 
     Matrix<T> &operator*=(T scalar) noexcept
     {
-        for (size_t i = 0; i < rows() * cols(); i++)
+        for (size_t i = 0; i < numel(); i++)
         {
             this->data_[i] *= scalar;
         }
@@ -2366,9 +2394,9 @@ public:
         }
         else
         {
-            for (size_t i = 0; i < rows() * cols(); i++)
+            for (size_t i = 0; i < numel(); i++)
             {
-                this->data_[i] /= scalar;
+                data_[i] /= scalar;
             }
         }
         return *this;
@@ -2381,13 +2409,11 @@ public:
             throw std::exception(_red + "Matrix::round() Integral types are not allowed to invoke .round() method." + _reset);
         }
         Matrix<T> result = *this;
-        for (size_t i = 0; i < rows(); i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            for (size_t j = 0; j < cols(); j++)
-            {
-                result(i, j) = std::round(result(i, j));
-            }
+            result.data_[i] = std::round(result.data_[i]);
         }
+        result << ".Matrix::round()";
         return result;
     }
 
@@ -2398,13 +2424,11 @@ public:
             throw std::exception(_red + "Matrix::ceil() Integral types are not allowed to invoke .ceil() method." + _reset);
         }
         Matrix<T> result = *this;
-        for (size_t i = 0; i < rows(); i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            for (size_t j = 0; j < cols(); j++)
-            {
-                result(i, j) = std::ceil(result(i, j));
-            }
+            result.data_[i] = std::ceil(result.data_[i]);
         }
+        result << ".Matrix::ceil()";
         return result;
     }
 
@@ -2415,13 +2439,11 @@ public:
             throw std::exception(_red + "Matrix::floor() Integral types are not allowed to invoke .floor() method." + _reset);
         }
         Matrix<T> result = *this;
-        for (size_t i = 0; i < rows(); i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            for (size_t j = 0; j < cols(); j++)
-            {
-                result(i, j) = std::floor(result(i, j));
-            }
+            result.data_[i] = std::floor(result.data_[i]);
         }
+        result << ".Matrix::floor()";
         return result;
     }
 
@@ -2577,50 +2599,50 @@ public:
         print();
     }
 
-    Matrix<uint8_t> operator||(const Matrix<T> &other) const
+    Matrix<j5r_bool> operator||(const Matrix<T> &other) const
     {
         if (rows_ != other.rows() || cols_ != other.cols())
         {
             throw std::invalid_argument(_red +
                                         "Matrix::operator||() Matrices must have the same dimensions." + _reset);
         }
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         bool mine, yours;
-        for (size_t i = 0; i < rows_ * cols_; i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            mine = static_cast<bool>((*this)(i));
-            yours = static_cast<bool>(other(i));
+            mine = static_cast<bool>(data_[i]);
+            yours = static_cast<bool>(other.data_[i]);
             result(i) = (mine || yours) ? 1 : 0;
         }
         return result;
     }
 
-    Matrix<uint8_t> operator&&(const Matrix<T> &other) const
+    Matrix<j5r_bool> operator&&(const Matrix<T> &other) const
     {
         if (rows_ != other.rows() || cols_ != other.cols())
         {
             throw std::invalid_argument(_red +
                                         "Matrix::operator||() Matrices must have the same dimensions." + _reset);
         }
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         bool mine, yours;
-        for (size_t i = 0; i < rows_ * cols_; i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            mine = static_cast<bool>((*this)(i));
-            yours = static_cast<bool>(other(i));
+            mine = static_cast<bool>(data_[i]);
+            yours = static_cast<bool>(other.data_[i]);
             result(i) = (mine && yours) ? 1 : 0;
         }
         return result;
     }
 
-    Matrix<uint8_t> operator!() const noexcept
+    Matrix<j5r_bool> operator!() const noexcept
     {
 
-        Matrix<uint8_t> result(rows_, cols_);
+        Matrix<j5r_bool> result(rows_, cols_);
         bool value;
-        for (size_t i = 0; i < rows_ * cols_; i++)
+        for (size_t i = 0; i < numel(); i++)
         {
-            value = static_cast<bool>((*this)(i));
+            value = static_cast<bool>(data_[i]);
             result(i) = value ? 0 : 1;
         }
         return result;
@@ -2637,6 +2659,151 @@ public:
         set_print_precision(v);
     }
     /* remova esses operadores acima */
+
+    // 1. COUNT (Varredura Total) -> Retorna um número (size_t)
+    size_t count() const
+    {
+        size_t c = 0;
+        for (size_t i = 0; i < numel(); i++)
+        {
+            if (static_cast<bool>(data_[i]))
+                c++;
+        }
+        return c;
+    }
+
+    // 2. COUNT (Por Eixo) -> Retorna uma Matriz de contagens
+    Matrix<size_t> count(Axis axis) const
+    {
+        if (axis == Axis::row)
+        {
+            Matrix<size_t> result(1, cols_, 0);
+            for (size_t j = 0; j < cols_; j++)
+            {
+                for (size_t i = 0; i < rows_; i++)
+                {
+                    if (static_cast<bool>((*this)(i, j)))
+                        result(0, j)++;
+                }
+            }
+            result >> get_comment() << ".Matrix::count(" << detail::__which_axis(axis) << ")";
+            return result;
+        }
+        else
+        {
+            Matrix<size_t> result(rows_, 1, 0);
+            for (size_t i = 0; i < rows_; i++)
+            {
+                for (size_t j = 0; j < cols_; j++)
+                {
+                    if (static_cast<bool>((*this)(i, j)))
+                        result(i, 0)++;
+                }
+            }
+            result >> get_comment() << ".Matrix::count(" << detail::__which_axis(axis) << ")";
+            return result;
+        }
+    }
+
+    // 1. ALL (Varredura Total) -> Retorna bool nativo
+    bool all() const
+    {
+        for (const auto &val : this->data_)
+        {
+            if (!static_cast<int>(val))
+                return false; // Achou um falso? Para tudo!
+        }
+        return true;
+    }
+
+    // 1. ANY (Varredura Total) -> Retorna bool nativo
+    bool any() const
+    {
+        for (const auto &val : this->data_)
+        {
+            if (static_cast<int>(val))
+                return true; // Achou um verdadeiro? Para tudo!
+        }
+        return false;
+    }
+
+    // 2. ALL (Por Eixo) -> Retorna uma máscara (Matrix<j5r_bool>)
+    Matrix<j5r_bool> j_all(Axis axis) const
+    {
+        if (axis == Axis::row)
+        {
+            Matrix<j5r_bool> result(1, cols_, 1); // Inicializa com 1 (assumindo verdadeiro)
+            for (size_t j = 0; j < cols_; j++)
+            {
+                for (size_t i = 0; i < rows_; i++)
+                {
+                    if (!static_cast<bool>((*this)(i, j)))
+                    {
+                        result(0, j) = 0;
+                        break;
+                    }
+                }
+            }
+            result >> get_comment() << ".Matrix::all(" << detail::__which_axis(axis) << ")";
+            return result;
+        }
+        else
+        {
+            Matrix<j5r_bool> result(rows_, 1, 1); // Inicializa com 1
+            for (size_t i = 0; i < rows_; i++)
+            {
+                for (size_t j = 0; j < cols_; j++)
+                {
+                    if (!static_cast<bool>((*this)(i, j)))
+                    {
+                        result(i, 0) = 0;
+                        break;
+                    }
+                }
+            }
+            result >> get_comment() << ".Matrix::all(" << detail::__which_axis(axis) << ")";
+            return result;
+        }
+    }
+
+    // 2. ANY (Por Eixo) -> Retorna uma máscara (Matrix<j5r_bool>)
+    Matrix<j5r_bool> any(Axis axis) const
+    {
+        if (axis == Axis::row)
+        {
+            Matrix<j5r_bool> result(1, cols_, 0); // Inicializa com 1 (assumindo verdadeiro)
+            for (size_t j = 0; j < cols_; j++)
+            {
+                for (size_t i = 0; i < rows_; i++)
+                {
+                    if (static_cast<bool>((*this)(i, j)))
+                    {
+                        result(0, j) = 1;
+                        break;
+                    }
+                }
+            }
+            result >> get_comment() << ".Matrix::any(" << detail::__which_axis(axis) << ")";
+            return result;
+        }
+        else
+        {
+            Matrix<j5r_bool> result(rows_, 1, 0); // Inicializa com 1
+            for (size_t i = 0; i < rows_; i++)
+            {
+                for (size_t j = 0; j < cols_; j++)
+                {
+                    if (static_cast<bool>((*this)(i, j)))
+                    {
+                        result(i, 0) = 1;
+                        break;
+                    }
+                }
+            }
+            result >> get_comment() << ".Matrix::any(" << detail::__which_axis(axis) << ")";
+            return result;
+        }
+    }
 };
 
 template <typename T>

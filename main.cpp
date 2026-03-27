@@ -3,7 +3,6 @@
 #include "MatrixShape.hpp"
 #include "MatrixGen.hpp"
 #include "MatrixLinAlg.hpp"
-// #include <cmath>
 
 int main()
 {
@@ -14,36 +13,33 @@ int main()
         using shape = MatrixShape;
         using gen = MatrixGen;
         using mx = Matrix<double>;
-        using mxi = Matrix<int>;
+        using mxi = Matrix<int>; // mxi::set_print_precision(0); mxi::set_print_width(0);
         using mxb = Matrixbool;
 
         // Matriz Assimétrica (Autovalores conhecidos: 3, 2, 1)
+
         mx A = {{7, 0, 0, 9},
-                {-1, 0, 9, 11},
-                {-2, 2, 2, 1},
-                {0, 1, 17, -1}};
+                 {-1, 0, 9, 9},
+                 {-2, 2, 2, 9},
+                 {0, 1, 17, 9}}, At;
 
-        A | 0;
-        A.debug(1);
-        A >> "Matrix A";
-        A.print();
+        mx num = gen::randi<int>(7,7);
+        mx den = gen::rand<double>(7,7,-10,10);
+       
+        (num > den).print();
+        (num < den).print();
+        (num >= den).print();
+        (num <= den).print();
+        (num != den).print();
+        (num == den).print();
 
-        mxi B = A;
-        B.debug(1);
-        B >> "Matrix B";
-        B.print();
-
-        mxb C = A;
-        C.debug(1);
-        C >> "Matrix C";
-        C.print();
-        mxb D = 1 - (mxb)(7 - A);
-        D >> "Matrix D";
-        D.print();
+        
+        
     }
     catch (const std::exception &e)
     {
-        std::cout << e.what() << "\n";
+        std::cout << e.what() << std::endl;
     }
+    
     return j5r(100);
 }
