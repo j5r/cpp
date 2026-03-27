@@ -26,12 +26,9 @@ int main()
         mx num = gen::randi<int>(7,7);
         mx den = gen::rand<double>(7,7,-10,10);
        
-        (num > den).print();
-        (num < den).print();
-        (num >= den).print();
-        (num <= den).print();
-        (num != den).print();
-        (num == den).print();
+        num.print();
+        std::cout << "contando 0's = " <<num.count() << std::endl;
+        std::cout << "contando 1's = " <<(num==1).count() << std::endl;
 
         
         

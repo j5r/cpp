@@ -15,6 +15,8 @@
 #include <initializer_list>
 #include <utility>
 #include <cstdint>
+#define STATIC_ASSERT_RED "\033[31m"
+#define STATIC_ASSERT_RESET "\033[0m"
 
 #define PI 3.14159265358979323846264338327950288419716939937510
 
@@ -2661,8 +2663,11 @@ public:
     /* remova esses operadores acima */
 
     // 1. COUNT (Varredura Total) -> Retorna um número (size_t)
-    size_t count() const
+    size_t count() const 
     {
+        static_assert(std::is_same_v<T, j5r_bool>,
+                      STATIC_ASSERT_RED  "\nMatrix::count() is available only for Matrixbool type (the same as Matrix<j5r_bool>).\n"  STATIC_ASSERT_RESET);
+
         size_t c = 0;
         for (size_t i = 0; i < numel(); i++)
         {
