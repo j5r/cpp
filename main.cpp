@@ -4,6 +4,8 @@
 #include "MatrixGen.hpp"
 #include "MatrixLinAlg.hpp"
 
+ 
+
 int main()
 {
     try
@@ -20,16 +22,13 @@ int main()
 
         mx A = {{7, 0, 0, 9},
                  {-1, 0, 9, 9},
-                 {-2, 2, 2, 9},
-                 {0, 1, 17, 9}}, At;
-
-        mx num = gen::randi<int>(7,7);
-        mx den = gen::rand<double>(7,7,-10,10);
-       
-        num.print();
-        std::cout << "contando 0's = " <<num.count() << std::endl;
-        std::cout << "contando 1's = " <<(num==1).count() << std::endl;
-
+                 {-2, 2, 2, 9}};
+    
+        
+        A.print();
+                 A.diag2().print();
+        
+        
         
         
     }

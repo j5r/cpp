@@ -140,15 +140,6 @@ namespace std
 // template <typename T> class Matrix { ... };
 // using Matrixbool = Matrix<j5r_bool>;
 
-inline ostringstream_extension strcc; // string concatenator like std::cout;
-// example
-//   strcc << "text " << 23 << " other text";
-// to get the resulting string there are three options:
-//   strcc.str();    //gets the string "text 23 other text"
-//   strcc.get();    //gets the string "text 23 other text"
-//   strcc();        //gets the string "text 23 other text"
-//   strcc(M);       //gets the string and sets in .msg() of matrix M
-
 inline int j5r(size_t seconds = 5)
 {
     auto command = "cmd /c timeout " + std::to_string(seconds);
@@ -197,6 +188,14 @@ enum class Axis
 namespace detail
 {
     std::string __which_axis(Axis a) { return (a == Axis::row ? "Axis::row" : "Axis::col"); }
+    inline ostringstream_extension __strcc; // string concatenator like std::cout;
+    // example
+    //   strcc << "text " << 23 << " other text";
+    // to get the resulting string there are three options:
+    //   strcc.str();    //gets the string "text 23 other text"
+    //   strcc.get();    //gets the string "text 23 other text"
+    //   strcc();        //gets the string "text 23 other text"
+    //   strcc(M);       //gets the string and sets in .msg() of matrix M
 }
 
 template <typename T>
@@ -221,6 +220,7 @@ private:
 
 public:
     friend class MatrixLinAlg;
+    friend class MatrixGen;
     // Construtores
     Matrix() : rows_(0), cols_(0) {}
     Matrix(size_t rows, size_t cols) : rows_(rows), cols_(cols), data_(rows * cols, T()) {}
@@ -1507,7 +1507,7 @@ public:
         return result;
     }
 
-    [[nodiscard]] bool equals(const Matrix<T> &other, T tolerance = static_cast<T>(1e-8)) const
+    [[nodiscard]] bool equals(const Matrix<T> &other, double tolerance = 1e-14) const
     {
         if (rows_ != other.rows() || cols_ != other.cols())
         {
@@ -2472,13 +2472,13 @@ public:
         return true;
     }
 
-    bool is_upper_triangular(bool strictly_lower = false) const noexcept
+    bool is_upper_triangular(bool strictly_upper = false) const noexcept
     {
         for (size_t i = 0; i < rows_; ++i)
         {
             for (size_t j = 0; j < cols_; ++j)
             {
-                if (strictly_lower)
+                if (strictly_upper)
                 {
                     // diagonal e acima devem ser zero
                     if (i >= j && (*this)(i, j) != T())
@@ -2558,31 +2558,31 @@ public:
 
     Matrix<T> &operator<<(const std::string &txt)
     {
-        strcc << comment << txt;
-        strcc(*this);
+        detail::__strcc << comment << txt;
+        detail::__strcc(*this);
         return *this;
     }
 
     Matrix<T> &operator>>(const std::string &txt)
     {
-        strcc << txt;
-        strcc(*this);
+        detail::__strcc << txt;
+        detail::__strcc(*this);
         return *this;
     }
 
-    template <typename U>
+    template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
     Matrix<T> &operator<<(U number)
     {
-        strcc << comment << number;
-        strcc(*this);
+        detail::__strcc << comment << number;
+        detail::__strcc(*this);
         return *this;
     }
 
-    template <typename U>
+    template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
     Matrix<T> &operator>>(U number)
     {
-        strcc << number;
-        strcc(*this);
+        detail::__strcc << number;
+        detail::__strcc(*this);
         return *this;
     }
 
@@ -2663,10 +2663,10 @@ public:
     /* remova esses operadores acima */
 
     // 1. COUNT (Varredura Total) -> Retorna um número (size_t)
-    size_t count() const 
+    size_t count() const
     {
         static_assert(std::is_same_v<T, j5r_bool>,
-                      STATIC_ASSERT_RED  "\nMatrix::count() is available only for Matrixbool type (the same as Matrix<j5r_bool>).\n"  STATIC_ASSERT_RESET);
+                      STATIC_ASSERT_RED "\nMatrix::count() is available only for Matrixbool type (the same as Matrix<j5r_bool>).\n" STATIC_ASSERT_RESET);
 
         size_t c = 0;
         for (size_t i = 0; i < numel(); i++)
@@ -2733,7 +2733,7 @@ public:
     }
 
     // 2. ALL (Por Eixo) -> Retorna uma máscara (Matrix<j5r_bool>)
-    Matrix<j5r_bool> j_all(Axis axis) const
+    Matrix<j5r_bool> all(Axis axis) const
     {
         if (axis == Axis::row)
         {
@@ -2809,34 +2809,47 @@ public:
             return result;
         }
     }
-};
 
-template <typename T>
-[[nodiscard]] inline Matrix<T> diag(const Matrix<T> &m)
-{
-    if (m.is_empty())
+    [[nodiscard]] Matrix<T> square_diag()
     {
-        throw std::invalid_argument(_red +
-                                    "\nFunction:diag() Empty matrix does not have diagonal. Please give a non-empty matrix.\n" + _reset);
-    }
+        if (is_empty())
+        {
+            throw std::invalid_argument(_red +
+                                        "\nFunction:diag() Empty matrix does not have diagonal. Please give a non-empty matrix.\n" + _reset);
+        }
 
-    if (m.is_rowvector() || m.is_colvector())
-    {
-        auto dim = m.cols() >= m.rows() ? m.cols() : m.rows();
+        if (is_vector())
+        {
+            Matrix<T> result(numel(), numel());
+            for (size_t i = 0; i < numel(); i++)
+            {
+                result(i, i) = (*this)(i);
+            }
+            return result;
+        }
+        auto dim = cols() <= rows() ? cols() : rows();
         Matrix<T> result(dim, dim);
         for (size_t i = 0; i < dim; i++)
         {
-            result(i, i) = m.is_rowvector() ? m(0, i) : m(i, 0);
+            result(i, i) = (*this)(i, i);
         }
         return result;
     }
-    auto dim = m.cols() <= m.rows() ? m.cols() : m.rows();
-    Matrix<T> result(dim, dim);
-    for (size_t i = 0; i < dim; i++)
-    {
-        result(i, i) = m(i, i);
-    }
-    return result;
-}
 
+    Matrix<T> diag2()
+    {
+        if (is_empty())
+        {
+            throw std::invalid_argument(_red +
+                                        "Matrix::ddiag() Empty matrix does not have diagonal. Please give a non-empty matrix." + _reset);
+        }
+
+        Matrix<T> result(rows(), 1);
+        for (size_t i = 0; i < rows(); i++)
+        {
+            result(i) = (*this)(i, cols() - 1 - i);
+        }
+        return result;
+    }
+};
 using Matrixbool = Matrix<j5r_bool>;
