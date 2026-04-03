@@ -5,4 +5,10 @@
 *.ini
 *.dat
 *.bin
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.bmp
+*.gif
 .vscode/
